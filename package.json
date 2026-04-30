@@ -9,6 +9,7 @@
     "db:migrate": "bun run --filter db db:migrate",
     "db:push": "bun run --filter db db:push",
     "db:studio": "bun run --filter db db:studio",
+    "db:seed": "bun run --filter db db:seed",
     "build": "bun run --filter '*' build",
     "format": "biome format --write .",
     "format:check": "biome format .",
