@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: windows-explorer-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: windows-explorer
+      POSTGRES_PASSWORD: windows-explorer
+      POSTGRES_DB: windows-explorer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

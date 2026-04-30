@@ -1,0 +1,27 @@
+{
+  "name": "windows-explorer",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:server": "bun run --filter server dev",
+    "dev:web": "bun run --filter web dev",
+    "db:generate": "bun run --filter db db:generate",
+    "db:migrate": "bun run --filter db db:migrate",
+    "db:push": "bun run --filter db db:push",
+    "db:studio": "bun run --filter db db:studio",
+    "build": "bun run --filter '*' build",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check --write .",
+    "typecheck": "tsc -b"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13"
+  }
+}
