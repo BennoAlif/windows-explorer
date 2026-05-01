@@ -3,14 +3,21 @@
   "private": true,
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:e2e": "bun --env-file=.env.test test tests/e2e",
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest",
-    "db": "workspace:*"
+    "@elysiajs/cors": "^1.4.2",
+    "@elysiajs/swagger": "^1.3.1",
+    "db": "workspace:*",
+    "elysia": "latest"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "@types/supertest": "^7.2.0",
+    "bun-types": "latest",
+    "supertest": "^7.2.2"
   }
 }
