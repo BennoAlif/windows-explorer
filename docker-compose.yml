@@ -11,5 +11,11 @@ services:
       POSTGRES_DB: windows-explorer
     volumes:
       - pgdata:/var/lib/postgresql/data
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: windows-explorer-jaeger
+    ports:
+      - "16686:16686"
+      - "4318:4318"
 volumes:
   pgdata:
