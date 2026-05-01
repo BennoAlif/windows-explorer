@@ -9,14 +9,19 @@ import type {
 export class FolderService {
   constructor(private folderRepository: FolderRepository) {}
 
-  getAll(): Promise<Folder[]> {
-    return this.folderRepository.getAll();
+  async getAll(): Promise<Folder[]> {
+    return await this.folderRepository.getRoot();
   }
 
-  async getById(id: Folder['id']): Promise<Folder> {
+  private async getById(id: Folder['id']): Promise<Folder> {
     const folder = await this.folderRepository.getById(id);
     if (!folder) throw new NotFoundError('Folder', id);
     return folder;
+  }
+
+  async getByParentId(parentId: Folder['id']): Promise<Folder[]> {
+    await this.getById(parentId);
+    return await this.folderRepository.getByParentId(parentId);
   }
 
   async create(data: CreateFolderDTO): Promise<Folder> {
@@ -24,7 +29,10 @@ export class FolderService {
       const parent = await this.folderRepository.getById(data.parentId);
       if (!parent) throw new NotFoundError('Parent folder', data.parentId);
     }
-    return this.folderRepository.create({ ...data, name: data.name.trim() });
+    return await this.folderRepository.create({
+      ...data,
+      name: data.name.trim(),
+    });
   }
 
   async update(id: Folder['id'], data: UpdateFolderDTO): Promise<Folder> {
@@ -35,7 +43,7 @@ export class FolderService {
       const parent = await this.folderRepository.getById(data.parentId);
       if (!parent) throw new NotFoundError('Parent folder', data.parentId);
     }
-    return this.folderRepository.update(id, {
+    return await this.folderRepository.update(id, {
       ...data,
       ...(data.name && { name: data.name.trim() }),
     });
@@ -43,6 +51,6 @@ export class FolderService {
 
   async delete(id: Folder['id']): Promise<void> {
     await this.getById(id);
-    return this.folderRepository.delete(id);
+    return await this.folderRepository.delete(id);
   }
 }

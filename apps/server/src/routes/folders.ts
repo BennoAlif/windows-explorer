@@ -7,9 +7,13 @@ const service = new FolderService(new FolderRepositoryImpl());
 
 export const foldersRoute = new Elysia({ prefix: '/folders' })
   .get('/', async () => ok(await service.getAll()))
-  .get('/:id', async ({ params }) => ok(await service.getById(params.id)), {
-    params: t.Object({ id: t.Number() }),
-  })
+  .get(
+    '/:id/children',
+    async ({ params }) => ok(await service.getByParentId(params.id)),
+    {
+      params: t.Object({ id: t.Number() }),
+    },
+  )
   .post('/', async ({ body }) => ok(await service.create(body)), {
     body: t.Object({
       name: t.String({ minLength: 1 }),
