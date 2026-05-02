@@ -1,30 +1,40 @@
 import { db } from "db";
 import { sql } from "drizzle-orm";
-import type { SearchItem, SearchRepository, SearchRow } from "../types/search";
+import type {
+	SearchItem,
+	SearchOptions,
+	SearchRepository,
+	SearchRow,
+} from "../types/search";
 
 export class SearchRepositoryImpl implements SearchRepository {
-	async globalSearch(query: string): Promise<SearchItem[]> {
+	async globalSearch(
+		query: string,
+		options: SearchOptions,
+	): Promise<SearchItem[]> {
+		const cursor = options.cursor;
+
 		const results = await db.execute(sql`
-        WITH RECURSIVE folder_paths AS (
-          SELECT
-            id,
-            name,
-            parent_id,
-            ('/' || name)::text AS path
-          FROM folders
-          WHERE parent_id IS NULL
-          
-          UNION ALL
+      WITH RECURSIVE folder_paths AS (
+        SELECT
+          id,
+          name,
+          parent_id,
+          ('/' || name)::text AS path
+        FROM folders
+        WHERE parent_id IS NULL
 
-          SELECT
-            f.id,
-            f.name,
-            f.parent_id,
-            folder_paths.path || '/' || f.name AS path
-          FROM folders f
-          JOIN folder_paths ON f.parent_id = folder_paths.id
-        )
+        UNION ALL
 
+        SELECT
+          f.id,
+          f.name,
+          f.parent_id,
+          folder_paths.path || '/' || f.name AS path
+        FROM folders f
+        JOIN folder_paths ON f.parent_id = folder_paths.id
+      ),
+      search_results AS (
         SELECT
           'folder' AS type,
           id,
@@ -47,9 +57,17 @@ export class SearchRepositoryImpl implements SearchRepository {
         FROM files
         JOIN folder_paths ON files.folder_id = folder_paths.id
         WHERE files.name ILIKE ${`%${query}%`}
-
-        ORDER BY type, name
-      `);
+      )
+      SELECT *
+      FROM search_results
+      WHERE ${
+				cursor
+					? sql`(type, name, id) > (${cursor.type}, ${cursor.name}, ${cursor.id})`
+					: sql`true`
+			}
+      ORDER BY type, name, id
+      LIMIT ${options.limit}
+    `);
 
 		return (results as unknown as SearchRow[]).map((row): SearchItem => {
 			if (row.type === "folder") {

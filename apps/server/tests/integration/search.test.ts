@@ -7,7 +7,7 @@ import { searchRoute } from "../../src/routes/search";
 import type { ApiErrorDetail, ApiResponse } from "../../src/types/api";
 import type { FileEntity } from "../../src/types/file";
 import type { Folder } from "../../src/types/folder";
-import type { SearchItem } from "../../src/types/search";
+import type { SearchResult } from "../../src/types/search";
 
 const app = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(foldersRoute)
@@ -90,10 +90,11 @@ describe("GET /v1/search", () => {
 		const res = await app.handle(new Request(`${BASE}/v1/search?q=${token}`));
 		expect(res.status).toBe(200);
 
-		const body = (await res.json()) as ApiResponse<SearchItem[]>;
+		const body = (await res.json()) as ApiResponse<SearchResult>;
 		expect(body.success).toBe(true);
+		expect(body.data?.nextCursor).toBeNull();
 		expect(
-			body.data?.some(
+			body.data?.items.some(
 				(item) =>
 					item.type === "folder" &&
 					item.id === child.data?.id &&
@@ -101,13 +102,65 @@ describe("GET /v1/search", () => {
 			),
 		).toBe(true);
 		expect(
-			body.data?.some(
+			body.data?.items.some(
 				(item) =>
 					item.type === "file" &&
 					item.id === file.data?.id &&
 					item.path === `/${token}-root/${token}-child/${token}-notes.txt`,
 			),
 		).toBe(true);
+	});
+
+	it("paginates global search results with a cursor", async () => {
+		const token = `integration-cursor-${Date.now()}`;
+
+		const rootRes = await postFolder({ name: `${token}-root` });
+		const root = (await rootRes.json()) as ApiResponse<Folder>;
+		if (!root.data) throw new Error("Expected root folder data");
+		createdIds.push(root.data.id);
+
+		const childRes = await postFolder({
+			name: `${token}-child`,
+			parentId: root.data.id,
+		});
+		const child = (await childRes.json()) as ApiResponse<Folder>;
+		if (!child.data) throw new Error("Expected child folder data");
+		createdIds.push(child.data.id);
+
+		await postFile(child.data.id, { name: `${token}-a.txt` });
+		await postFile(child.data.id, { name: `${token}-b.txt` });
+
+		const firstRes = await app.handle(
+			new Request(`${BASE}/v1/search?q=${token}&limit=1`),
+		);
+		expect(firstRes.status).toBe(200);
+
+		const firstBody = (await firstRes.json()) as ApiResponse<SearchResult>;
+		expect(firstBody.data?.items).toHaveLength(1);
+		expect(typeof firstBody.data?.nextCursor).toBe("string");
+
+		const firstItem = firstBody.data?.items[0];
+		const cursor = firstBody.data?.nextCursor;
+		if (!firstItem || !cursor) throw new Error("Expected first page cursor");
+
+		const secondRes = await app.handle(
+			new Request(
+				`${BASE}/v1/search?q=${token}&limit=1&cursor=${encodeURIComponent(cursor)}`,
+			),
+		);
+		expect(secondRes.status).toBe(200);
+
+		const secondBody = (await secondRes.json()) as ApiResponse<SearchResult>;
+		expect(secondBody.data?.items).toHaveLength(1);
+		expect(secondBody.data?.items[0]).not.toEqual(firstItem);
+	});
+
+	it("returns 400 for an invalid cursor", async () => {
+		const res = await app.handle(
+			new Request(`${BASE}/v1/search?q=notes&cursor=invalid-cursor`),
+		);
+
+		await expectErrorResponse(res, 400, "BAD_REQUEST", "Invalid cursor");
 	});
 
 	it("returns 422 for an empty query", async () => {

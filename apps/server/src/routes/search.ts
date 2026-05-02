@@ -7,8 +7,18 @@ const service = new SearchService(new SearchRepositoryImpl());
 
 export const searchRoute = new Elysia({ prefix: "/search" }).get(
 	"/",
-	async ({ query }) => ok(await service.globalSearch(query.q)),
+	async ({ query }) =>
+		ok(
+			await service.globalSearch(query.q, {
+				limit: query.limit,
+				cursor: query.cursor,
+			}),
+		),
 	{
-		query: t.Object({ q: t.String({ minLength: 1 }) }),
+		query: t.Object({
+			q: t.String({ minLength: 1 }),
+			limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+			cursor: t.Optional(t.String({ minLength: 1 })),
+		}),
 	},
 );

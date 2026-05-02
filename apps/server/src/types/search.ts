@@ -26,6 +26,22 @@ export type SearchRow = {
 	path: string;
 };
 
+export type SearchCursor = {
+	type: "folder" | "file";
+	name: string;
+	id: number;
+};
+
+export type SearchOptions = {
+	limit: number;
+	cursor?: SearchCursor;
+};
+
+export type SearchResult = {
+	items: SearchItem[];
+	nextCursor: string | null;
+};
+
 export interface SearchRepository {
-	globalSearch(query: string): Promise<SearchItem[]>;
+	globalSearch(query: string, options: SearchOptions): Promise<SearchItem[]>;
 }
