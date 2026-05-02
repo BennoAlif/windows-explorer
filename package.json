@@ -1,33 +1,36 @@
 {
-  "name": "windows-explorer",
-  "private": true,
-  "scripts": {
-    "dev": "bun run --filter '*' dev",
-    "dev:server": "bun run --filter server dev",
-    "dev:web": "bun run --filter web dev",
-    "db:generate": "bun run --filter db db:generate",
-    "db:migrate": "bun run --filter db db:migrate",
-    "db:push": "bun run --filter db db:push",
-    "db:studio": "bun run --filter db db:studio",
-    "db:seed": "bun run --filter db db:seed",
-    "test": "bun run --filter '*' test",
-    "test:server": "bun run --filter server test",
-    "test:server:unit": "bun run --filter server test:unit",
-    "test:server:integration": "bun run --filter server test:integration",
-    "test:server:e2e": "bun run --filter server test:e2e",
-    "build": "bun run --filter '*' build",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "check": "biome check --write .",
-    "typecheck": "tsc -b"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.13"
-  }
+	"name": "windows-explorer",
+	"private": true,
+	"scripts": {
+		"dev": "bun run --filter '*' dev",
+		"dev:server": "bun run --filter server dev",
+		"dev:web": "bun run --filter web dev",
+		"db:generate": "bun run --filter db db:generate",
+		"db:migrate": "bun run --filter db db:migrate",
+		"db:push": "bun run --filter db db:push",
+		"db:studio": "bun run --filter db db:studio",
+		"db:seed": "bun run --filter db db:seed",
+		"load:seed": "bun run --filter db load:seed",
+		"load:test": "k6 run load-tests/scenarios/full-workflow.js",
+		"load:test:smoke": "k6 run -e K6_PROFILE=smoke load-tests/scenarios/full-workflow.js",
+		"test": "bun run --filter '*' test",
+		"test:server": "bun run --filter server test",
+		"test:server:unit": "bun run --filter server test:unit",
+		"test:server:integration": "bun run --filter server test:integration",
+		"test:server:e2e": "bun run --filter server test:e2e",
+		"build": "bun run --filter '*' build",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"lint:fix": "biome lint --write .",
+		"check": "biome check --write .",
+		"typecheck": "tsc -b"
+	},
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.13"
+	}
 }
