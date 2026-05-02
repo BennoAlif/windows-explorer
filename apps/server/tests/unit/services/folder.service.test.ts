@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "../../../src/errors";
 import { FolderService } from "../../../src/services/folder.service";
+import type { FileEntity, FileRepository } from "../../../src/types/file";
 import type { Folder, FolderRepository } from "../../../src/types/folder";
 
 const mockFolder: Folder = {
@@ -19,6 +20,14 @@ const mockChildFolder: Folder = {
 	updatedAt: new Date(),
 };
 
+const mockFile: FileEntity = {
+	id: 10,
+	name: "notes.txt",
+	folderId: 1,
+	createdAt: new Date(),
+	updatedAt: new Date(),
+};
+
 describe("FolderService", () => {
 	let service: FolderService;
 	let getRoot: ReturnType<typeof mock>;
@@ -27,6 +36,7 @@ describe("FolderService", () => {
 	let create: ReturnType<typeof mock>;
 	let update: ReturnType<typeof mock>;
 	let deleteFolder: ReturnType<typeof mock>;
+	let getAllByFolderId: ReturnType<typeof mock>;
 
 	beforeEach(() => {
 		getRoot = mock(() => Promise.resolve([mockFolder]));
@@ -39,6 +49,7 @@ describe("FolderService", () => {
 		create = mock(() => Promise.resolve(mockFolder));
 		update = mock(() => Promise.resolve(mockFolder));
 		deleteFolder = mock(() => Promise.resolve());
+		getAllByFolderId = mock(() => Promise.resolve([mockFile]));
 
 		const mockRepo: FolderRepository = {
 			getRoot,
@@ -49,7 +60,15 @@ describe("FolderService", () => {
 			delete: deleteFolder,
 		};
 
-		service = new FolderService(mockRepo);
+		const mockFileRepo: FileRepository = {
+			getAllByFolderId,
+			getById: mock(),
+			create: mock(),
+			update: mock(),
+			delete: mock(),
+		};
+
+		service = new FolderService(mockRepo, mockFileRepo);
 	});
 
 	describe("getAll", () => {
@@ -61,21 +80,26 @@ describe("FolderService", () => {
 		});
 	});
 
-	describe("getByParentId", () => {
-		it("returns children when parent exists", async () => {
-			const result = await service.getByParentId(1);
+	describe("getItemsByFolderId", () => {
+		it("returns child folders and files when folder exists", async () => {
+			const result = await service.getItemsByFolderId(1);
 
-			expect(result).toEqual([mockChildFolder]);
+			expect(result).toEqual([
+				{ type: "folder", id: mockChildFolder.id, name: mockChildFolder.name },
+				{ type: "file", id: mockFile.id, name: mockFile.name },
+			]);
 			expect(getById.mock.calls).toEqual([[1]]);
 			expect(getByParentId.mock.calls).toEqual([[1]]);
+			expect(getAllByFolderId.mock.calls).toEqual([[1]]);
 		});
 
-		it("throws NotFoundError when parent does not exist", async () => {
-			await expect(service.getByParentId(999)).rejects.toBeInstanceOf(
+		it("throws NotFoundError when folder does not exist", async () => {
+			await expect(service.getItemsByFolderId(999)).rejects.toBeInstanceOf(
 				NotFoundError,
 			);
 			expect(getById.mock.calls).toEqual([[999]]);
 			expect(getByParentId.mock.calls).toEqual([]);
+			expect(getAllByFolderId.mock.calls).toEqual([]);
 		});
 	});
 

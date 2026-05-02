@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
 import { withErrorHandling } from "../../src/plugins/error-handler";
+import { filesRoute } from "../../src/routes/files";
 import { foldersRoute } from "../../src/routes/folders";
 import type { ApiErrorDetail, ApiResponse } from "../../src/types/api";
-import type { Folder } from "../../src/types/folder";
+import type { FileEntity } from "../../src/types/file";
+import type { Folder, FolderItem } from "../../src/types/folder";
 
 const app = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(foldersRoute)
+	.use(filesRoute)
 	.get("/test-error", () => {
 		throw new Error("Unexpected failure");
 	});
@@ -25,6 +28,24 @@ const post = (body: unknown) =>
 const patch = (id: Folder["id"], body: unknown) =>
 	app.handle(
 		new Request(`${BASE}/v1/folders/${id}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+		}),
+	);
+
+const postFile = (folderId: Folder["id"], body: unknown) =>
+	app.handle(
+		new Request(`${BASE}/v1/folders/${folderId}/files`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+		}),
+	);
+
+const patchFile = (id: FileEntity["id"], body: unknown) =>
+	app.handle(
+		new Request(`${BASE}/v1/files/${id}`, {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(body),
@@ -71,8 +92,8 @@ describe("GET /v1/folders", () => {
 	});
 });
 
-describe("GET /v1/folders/:id/children", () => {
-	it("returns child folders for an existing parent", async () => {
+describe("GET /v1/folders/:id/items", () => {
+	it("returns child folders and files for an existing folder", async () => {
 		const parentRes = await post({ name: `integration-parent-${Date.now()}` });
 		const parent = (await parentRes.json()) as ApiResponse<Folder>;
 		if (!parent.data) throw new Error("Expected parent folder data");
@@ -86,20 +107,33 @@ describe("GET /v1/folders/:id/children", () => {
 		if (!child.data) throw new Error("Expected child folder data");
 		createdIds.push(child.data.id);
 
+		const fileRes = await postFile(parent.data.id, {
+			name: `integration-file-${Date.now()}.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
 		const res = await app.handle(
-			new Request(`${BASE}/v1/folders/${parent.data.id}/children`),
+			new Request(`${BASE}/v1/folders/${parent.data.id}/items`),
 		);
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as ApiResponse<Folder[]>;
+		const body = (await res.json()) as ApiResponse<FolderItem[]>;
 		expect(body.success).toBe(true);
-		expect(body.data?.some((folder) => folder.id === child.data?.id)).toBe(
-			true,
-		);
+		expect(
+			body.data?.some(
+				(item) => item.type === "folder" && item.id === child.data?.id,
+			),
+		).toBe(true);
+		expect(
+			body.data?.some(
+				(item) => item.type === "file" && item.id === file.data?.id,
+			),
+		).toBe(true);
 	});
 
-	it("returns 404 for a missing parent", async () => {
+	it("returns 404 for a missing folder", async () => {
 		const res = await app.handle(
-			new Request(`${BASE}/v1/folders/999999/children`),
+			new Request(`${BASE}/v1/folders/999999/items`),
 		);
 		await expectErrorResponse(
 			res,
@@ -110,9 +144,7 @@ describe("GET /v1/folders/:id/children", () => {
 	});
 
 	it("returns 422 for a non-numeric parent id", async () => {
-		const res = await app.handle(
-			new Request(`${BASE}/v1/folders/abc/children`),
-		);
+		const res = await app.handle(new Request(`${BASE}/v1/folders/abc/items`));
 		await expectErrorResponse(
 			res,
 			422,
@@ -215,6 +247,58 @@ describe("POST /v1/folders", () => {
 			409,
 			"CONFLICT",
 			`Folder "${name}" already exists`,
+		);
+	});
+});
+
+describe("POST /v1/folders/:folderId/files", () => {
+	it("creates a file inside an existing folder", async () => {
+		const folderRes = await post({
+			name: `integration-file-parent-${Date.now()}`,
+		});
+		const folder = (await folderRes.json()) as ApiResponse<Folder>;
+		if (!folder.data) throw new Error("Expected folder data");
+		createdIds.push(folder.data.id);
+
+		const res = await postFile(folder.data.id, {
+			name: `integration-file-${Date.now()}.txt`,
+		});
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as ApiResponse<FileEntity>;
+		expect(body.success).toBe(true);
+		expect(body.data?.folderId).toBe(folder.data.id);
+		expect(typeof body.data?.id).toBe("number");
+	});
+
+	it("returns 404 when folder does not exist", async () => {
+		const res = await postFile(999999, {
+			name: `integration-missing-file-${Date.now()}.txt`,
+		});
+		await expectErrorResponse(
+			res,
+			404,
+			"NOT_FOUND",
+			"Folder with id 999999 not found",
+		);
+	});
+
+	it("returns 409 for a duplicate file name in the same folder", async () => {
+		const folderRes = await post({
+			name: `integration-file-conflict-parent-${Date.now()}`,
+		});
+		const folder = (await folderRes.json()) as ApiResponse<Folder>;
+		if (!folder.data) throw new Error("Expected folder data");
+		createdIds.push(folder.data.id);
+
+		const name = `integration-conflict-${Date.now()}.txt`;
+		await postFile(folder.data.id, { name });
+
+		const res = await postFile(folder.data.id, { name });
+		await expectErrorResponse(
+			res,
+			409,
+			"CONFLICT",
+			`File "${name}" already exists`,
 		);
 	});
 });
@@ -333,6 +417,128 @@ describe("PATCH /v1/folders/:id", () => {
 			400,
 			"BAD_REQUEST",
 			"A folder cannot be its own parent",
+		);
+	});
+});
+
+describe("PATCH /v1/files/:id", () => {
+	it("renames a file and returns 200", async () => {
+		const folderRes = await post({
+			name: `integration-file-patch-parent-${Date.now()}`,
+		});
+		const folder = (await folderRes.json()) as ApiResponse<Folder>;
+		if (!folder.data) throw new Error("Expected folder data");
+		createdIds.push(folder.data.id);
+
+		const fileRes = await postFile(folder.data.id, {
+			name: `integration-patch-${Date.now()}.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
+		const res = await patchFile(file.data.id, {
+			name: `integration-patched-${Date.now()}.txt`,
+		});
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as ApiResponse<FileEntity>;
+		expect(body.success).toBe(true);
+		expect(body.data?.id).toBe(file.data.id);
+	});
+
+	it("moves a file to an existing folder", async () => {
+		const firstFolderRes = await post({
+			name: `integration-file-move-from-${Date.now()}`,
+		});
+		const firstFolder = (await firstFolderRes.json()) as ApiResponse<Folder>;
+		if (!firstFolder.data) throw new Error("Expected first folder data");
+		createdIds.push(firstFolder.data.id);
+
+		const secondFolderRes = await post({
+			name: `integration-file-move-to-${Date.now()}`,
+		});
+		const secondFolder = (await secondFolderRes.json()) as ApiResponse<Folder>;
+		if (!secondFolder.data) throw new Error("Expected second folder data");
+		createdIds.push(secondFolder.data.id);
+
+		const fileRes = await postFile(firstFolder.data.id, {
+			name: `integration-move-${Date.now()}.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
+		const res = await patchFile(file.data.id, {
+			folderId: secondFolder.data.id,
+		});
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as ApiResponse<FileEntity>;
+		expect(body.success).toBe(true);
+		expect(body.data?.folderId).toBe(secondFolder.data.id);
+	});
+
+	it("returns 404 when moving to a missing folder", async () => {
+		const folderRes = await post({
+			name: `integration-file-missing-move-parent-${Date.now()}`,
+		});
+		const folder = (await folderRes.json()) as ApiResponse<Folder>;
+		if (!folder.data) throw new Error("Expected folder data");
+		createdIds.push(folder.data.id);
+
+		const fileRes = await postFile(folder.data.id, {
+			name: `integration-missing-move-${Date.now()}.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
+		const res = await patchFile(file.data.id, { folderId: 999999 });
+		await expectErrorResponse(
+			res,
+			404,
+			"NOT_FOUND",
+			"Folder with id 999999 not found",
+		);
+	});
+
+	it("returns 404 for a non-existing file", async () => {
+		const res = await patchFile(999999, { name: "x.txt" });
+		await expectErrorResponse(
+			res,
+			404,
+			"NOT_FOUND",
+			"File with id 999999 not found",
+		);
+	});
+});
+
+describe("DELETE /v1/files/:id", () => {
+	it("deletes a file and returns 200", async () => {
+		const folderRes = await post({
+			name: `integration-file-delete-parent-${Date.now()}`,
+		});
+		const folder = (await folderRes.json()) as ApiResponse<Folder>;
+		if (!folder.data) throw new Error("Expected folder data");
+		createdIds.push(folder.data.id);
+
+		const fileRes = await postFile(folder.data.id, {
+			name: `integration-delete-${Date.now()}.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
+		const res = await app.handle(
+			new Request(`${BASE}/v1/files/${file.data.id}`, { method: "DELETE" }),
+		);
+		expect(res.status).toBe(200);
+	});
+
+	it("returns 404 for a non-existing file", async () => {
+		const res = await app.handle(
+			new Request(`${BASE}/v1/files/999999`, { method: "DELETE" }),
+		);
+		await expectErrorResponse(
+			res,
+			404,
+			"NOT_FOUND",
+			"File with id 999999 not found",
 		);
 	});
 });
