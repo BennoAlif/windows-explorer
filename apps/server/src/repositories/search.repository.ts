@@ -15,57 +15,27 @@ export class SearchRepositoryImpl implements SearchRepository {
 		const cursor = options.cursor;
 
 		const results = await db.execute(sql`
-      WITH RECURSIVE folder_paths AS (
-        SELECT
-          id,
-          name,
-          parent_id,
-          ('/' || name)::text AS path
-        FROM folders
-        WHERE parent_id IS NULL
-
-        UNION ALL
-
-        SELECT
-          f.id,
-          f.name,
-          f.parent_id,
-          folder_paths.path || '/' || f.name AS path
-        FROM folders f
-        JOIN folder_paths ON f.parent_id = folder_paths.id
-      ),
-      search_results AS (
-        SELECT
-          'folder' AS type,
-          id,
-          name,
-          parent_id AS "parentId",
-          NULL::integer AS "folderId",
-          path
-        FROM folder_paths
-        WHERE name ILIKE ${`%${query}%`}
-
-        UNION ALL
-
-        SELECT
-          'file' AS type,
-          files.id,
-          files.name,
-          NULL::integer AS "parentId",
-          files.folder_id AS "folderId",
-          folder_paths.path || '/' || files.name AS path
-        FROM files
-        JOIN folder_paths ON files.folder_id = folder_paths.id
-        WHERE files.name ILIKE ${`%${query}%`}
-      )
-      SELECT *
-      FROM search_results
+      SELECT
+        item_type AS type,
+        item_id AS id,
+        name,
+        CASE
+          WHEN item_type = 'folder' THEN parent_folder_id
+          ELSE NULL
+        END AS "parentId",
+        CASE
+          WHEN item_type = 'file' THEN parent_folder_id
+          ELSE NULL
+        END AS "folderId",
+        path
+      FROM search_index
       WHERE ${
 				cursor
-					? sql`(type, name, id) > (${cursor.type}, ${cursor.name}, ${cursor.id})`
+					? sql`(item_type, name, item_id) > (${cursor.type}, ${cursor.name}, ${cursor.id})`
 					: sql`true`
 			}
-      ORDER BY type, name, id
+      AND name ILIKE ${`%${query}%`}
+      ORDER BY item_type, name, item_id
       LIMIT ${options.limit}
     `);
 
@@ -80,11 +50,15 @@ export class SearchRepositoryImpl implements SearchRepository {
 				};
 			}
 
+			if (row.folderId === null) {
+				throw new Error("Search index file row is missing folderId");
+			}
+
 			return {
 				type: "file",
 				id: row.id,
 				name: row.name,
-				folderId: row.folderId!,
+				folderId: row.folderId,
 				path: row.path,
 			};
 		});

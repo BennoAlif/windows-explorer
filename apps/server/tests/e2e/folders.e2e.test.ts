@@ -449,7 +449,7 @@ describe("PATCH /v1/files/:id", () => {
 	});
 
 	it("returns 404 for a non-existing file", async () => {
-		const res = await fetch(`${BASE}/v1/files/999999`, {
+		const res = await fetch(`${BASE}/v1/files/2147483647`, {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ name: "x.txt" }),
@@ -458,7 +458,7 @@ describe("PATCH /v1/files/:id", () => {
 			res,
 			404,
 			"NOT_FOUND",
-			"File with id 999999 not found",
+			"File with id 2147483647 not found",
 		);
 	});
 });
@@ -485,12 +485,14 @@ describe("DELETE /v1/files/:id", () => {
 	});
 
 	it("returns 404 for a non-existing file", async () => {
-		const res = await fetch(`${BASE}/v1/files/999999`, { method: "DELETE" });
+		const res = await fetch(`${BASE}/v1/files/2147483647`, {
+			method: "DELETE",
+		});
 		await expectErrorResponse(
 			res,
 			404,
 			"NOT_FOUND",
-			"File with id 999999 not found",
+			"File with id 2147483647 not found",
 		);
 	});
 });

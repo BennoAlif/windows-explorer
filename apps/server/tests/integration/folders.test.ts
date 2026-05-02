@@ -611,12 +611,12 @@ describe("PATCH /v1/files/:id", () => {
 	});
 
 	it("returns 404 for a non-existing file", async () => {
-		const res = await patchFile(999999, { name: "x.txt" });
+		const res = await patchFile(2147483647, { name: "x.txt" });
 		await expectErrorResponse(
 			res,
 			404,
 			"NOT_FOUND",
-			"File with id 999999 not found",
+			"File with id 2147483647 not found",
 		);
 	});
 });
@@ -644,13 +644,13 @@ describe("DELETE /v1/files/:id", () => {
 
 	it("returns 404 for a non-existing file", async () => {
 		const res = await app.handle(
-			new Request(`${BASE}/v1/files/999999`, { method: "DELETE" }),
+			new Request(`${BASE}/v1/files/2147483647`, { method: "DELETE" }),
 		);
 		await expectErrorResponse(
 			res,
 			404,
 			"NOT_FOUND",
-			"File with id 999999 not found",
+			"File with id 2147483647 not found",
 		);
 	});
 });
