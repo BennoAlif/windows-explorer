@@ -15,18 +15,42 @@ import type {
 
 export class FolderRepositoryImpl implements FolderRepository {
 	async getRoot(): Promise<Folder[]> {
-		return await db.select().from(folders).where(isNull(folders.parentId));
+		return await db
+			.select({
+				id: folders.id,
+				name: folders.name,
+				parentId: folders.parentId,
+				createdAt: folders.createdAt,
+				updatedAt: folders.updatedAt,
+			})
+			.from(folders)
+			.where(isNull(folders.parentId));
 	}
 
 	async getByParentId(parentId: Folder["id"]): Promise<Folder[]> {
 		return await db
-			.select()
+			.select({
+				id: folders.id,
+				name: folders.name,
+				parentId: folders.parentId,
+				createdAt: folders.createdAt,
+				updatedAt: folders.updatedAt,
+			})
 			.from(folders)
 			.where(eq(folders.parentId, parentId));
 	}
 
 	async getById(id: Folder["id"]): Promise<Folder | null> {
-		const [folder] = await db.select().from(folders).where(eq(folders.id, id));
+		const [folder] = await db
+			.select({
+				id: folders.id,
+				name: folders.name,
+				parentId: folders.parentId,
+				createdAt: folders.createdAt,
+				updatedAt: folders.updatedAt,
+			})
+			.from(folders)
+			.where(eq(folders.id, id));
 		return folder ?? null;
 	}
 

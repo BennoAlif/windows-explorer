@@ -1,19 +1,32 @@
-import type { folders } from 'db';
+import type { folders } from "db";
+import type { FileEntity } from "./file";
 
 export type Folder = typeof folders.$inferSelect;
 
 export type CreateFolderDTO = Omit<
-  typeof folders.$inferInsert,
-  'id' | 'createdAt' | 'updatedAt'
+	typeof folders.$inferInsert,
+	"id" | "createdAt" | "updatedAt"
 >;
 
 export type UpdateFolderDTO = Partial<CreateFolderDTO>;
 
 export interface FolderRepository {
-  getRoot(): Promise<Folder[]>;
-  getById(id: Folder['id']): Promise<Folder | null>;
-  getByParentId(parentId: Folder['id']): Promise<Folder[]>;
-  create(data: CreateFolderDTO): Promise<Folder>;
-  update(id: Folder['id'], data: UpdateFolderDTO): Promise<Folder>;
-  delete(id: Folder['id']): Promise<void>;
+	getRoot(): Promise<Folder[]>;
+	getById(id: Folder["id"]): Promise<Folder | null>;
+	getByParentId(parentId: Folder["id"]): Promise<Folder[]>;
+	create(data: CreateFolderDTO): Promise<Folder>;
+	update(id: Folder["id"], data: UpdateFolderDTO): Promise<Folder>;
+	delete(id: Folder["id"]): Promise<void>;
 }
+
+export type FolderItem =
+	| {
+			type: "folder";
+			id: Folder["id"];
+			name: Folder["name"];
+	  }
+	| {
+			type: "file";
+			id: FileEntity["id"];
+			name: FileEntity["name"];
+	  };

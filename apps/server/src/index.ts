@@ -6,8 +6,11 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { Elysia } from "elysia";
 import { withErrorHandling } from "./plugins/error-handler";
 import { foldersRoute } from "./routes/folders";
+import { filesRoute } from "./routes/files";
 
-const v1 = withErrorHandling(new Elysia({ prefix: "/v1" })).use(foldersRoute);
+const v1 = withErrorHandling(new Elysia({ prefix: "/v1" }))
+	.use(foldersRoute)
+	.use(filesRoute);
 
 const app = withErrorHandling(new Elysia())
 	.use(cors())
