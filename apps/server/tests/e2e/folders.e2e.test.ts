@@ -4,9 +4,11 @@ import { Elysia } from "elysia";
 import { withErrorHandling } from "../../src/plugins/error-handler";
 import { filesRoute } from "../../src/routes/files";
 import { foldersRoute } from "../../src/routes/folders";
+import { searchRoute } from "../../src/routes/search";
 import type { ApiErrorDetail, ApiResponse } from "../../src/types/api";
 import type { FileEntity } from "../../src/types/file";
 import type { Folder, FolderItem } from "../../src/types/folder";
+import type { SearchItem } from "../../src/types/search";
 
 const BASE = "http://localhost:4000";
 
@@ -18,7 +20,8 @@ beforeAll(() => {
 		.use(
 			withErrorHandling(new Elysia({ prefix: "/v1" }))
 				.use(foldersRoute)
-				.use(filesRoute),
+				.use(filesRoute)
+				.use(searchRoute),
 		)
 		.listen(4000);
 });
@@ -122,6 +125,59 @@ describe("GET /v1/folders/:id/items", () => {
 			"NOT_FOUND",
 			"Folder with id 999999 not found",
 		);
+	});
+});
+
+describe("GET /v1/search", () => {
+	it("globally searches folders and files with recursive paths", async () => {
+		const token = `e2e-search-${Date.now()}`;
+
+		const rootRes = await post({ name: `${token}-root` });
+		const root = (await rootRes.json()) as ApiResponse<Folder>;
+		if (!root.data) throw new Error("Expected root folder data");
+		createdIds.push(root.data.id);
+
+		const childRes = await post({
+			name: `${token}-child`,
+			parentId: root.data.id,
+		});
+		const child = (await childRes.json()) as ApiResponse<Folder>;
+		if (!child.data) throw new Error("Expected child folder data");
+		createdIds.push(child.data.id);
+
+		const fileRes = await postFile(child.data.id, {
+			name: `${token}-notes.txt`,
+		});
+		const file = (await fileRes.json()) as ApiResponse<FileEntity>;
+		if (!file.data) throw new Error("Expected file data");
+
+		const res = await fetch(`${BASE}/v1/search?q=${token}`);
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as ApiResponse<SearchItem[]>;
+		expect(body.success).toBe(true);
+		expect(
+			body.data?.some(
+				(item) =>
+					item.type === "folder" &&
+					item.id === child.data?.id &&
+					item.path === `/${token}-root/${token}-child`,
+			),
+		).toBe(true);
+		expect(
+			body.data?.some(
+				(item) =>
+					item.type === "file" &&
+					item.id === file.data?.id &&
+					item.path === `/${token}-root/${token}-child/${token}-notes.txt`,
+			),
+		).toBe(true);
+	});
+
+	it("returns 400 for a whitespace-only query", async () => {
+		const res = await fetch(`${BASE}/v1/search?q=%20%20%20`);
+
+		await expectErrorResponse(res, 400, "BAD_REQUEST", "Query cannot be empty");
 	});
 });
 

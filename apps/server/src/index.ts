@@ -7,10 +7,12 @@ import { Elysia } from "elysia";
 import { withErrorHandling } from "./plugins/error-handler";
 import { foldersRoute } from "./routes/folders";
 import { filesRoute } from "./routes/files";
+import { searchRoute } from "./routes/search";
 
 const v1 = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(foldersRoute)
-	.use(filesRoute);
+	.use(filesRoute)
+	.use(searchRoute);
 
 const app = withErrorHandling(new Elysia())
 	.use(cors())
