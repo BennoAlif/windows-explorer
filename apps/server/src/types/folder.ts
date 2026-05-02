@@ -11,9 +11,12 @@ export type CreateFolderDTO = Omit<
 export type UpdateFolderDTO = Partial<CreateFolderDTO>;
 
 export interface FolderRepository {
-	getRoot(): Promise<Folder[]>;
+	getRootPage(options: FolderPageOptions): Promise<Folder[]>;
 	getById(id: Folder["id"]): Promise<Folder | null>;
-	getByParentId(parentId: Folder["id"]): Promise<Folder[]>;
+	getItemsByFolderId(
+		folderId: Folder["id"],
+		options: FolderItemPageOptions,
+	): Promise<FolderItem[]>;
 	create(data: CreateFolderDTO): Promise<Folder>;
 	update(id: Folder["id"], data: UpdateFolderDTO): Promise<Folder>;
 	delete(id: Folder["id"]): Promise<void>;
@@ -30,3 +33,34 @@ export type FolderItem =
 			id: FileEntity["id"];
 			name: FileEntity["name"];
 	  };
+
+export type FolderCursor = {
+	name: string;
+	id: number;
+};
+
+export type FolderItemCursor = {
+	type: "folder" | "file";
+	name: string;
+	id: number;
+};
+
+export type FolderPageOptions = {
+	limit: number;
+	cursor?: FolderCursor;
+};
+
+export type FolderItemPageOptions = {
+	limit: number;
+	cursor?: FolderItemCursor;
+};
+
+export type FolderListResult = {
+	items: Folder[];
+	nextCursor: string | null;
+};
+
+export type FolderItemResult = {
+	items: FolderItem[];
+	nextCursor: string | null;
+};

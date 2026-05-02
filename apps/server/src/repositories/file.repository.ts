@@ -1,5 +1,5 @@
 import { db, files } from "db";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
 	ConflictError,
 	InternalServerError,

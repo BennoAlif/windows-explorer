@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "../../../src/errors";
 import { FolderService } from "../../../src/services/folder.service";
-import type { FileEntity, FileRepository } from "../../../src/types/file";
 import type { Folder, FolderRepository } from "../../../src/types/folder";
 
 const mockFolder: Folder = {
@@ -20,27 +19,25 @@ const mockChildFolder: Folder = {
 	updatedAt: new Date(),
 };
 
-const mockFile: FileEntity = {
-	id: 10,
-	name: "notes.txt",
-	folderId: 1,
+const mockSecondFolder: Folder = {
+	id: 3,
+	name: "Downloads",
+	parentId: null,
 	createdAt: new Date(),
 	updatedAt: new Date(),
 };
 
 describe("FolderService", () => {
 	let service: FolderService;
-	let getRoot: ReturnType<typeof mock>;
-	let getByParentId: ReturnType<typeof mock>;
+	let getRootPage: ReturnType<typeof mock>;
 	let getById: ReturnType<typeof mock>;
 	let create: ReturnType<typeof mock>;
 	let update: ReturnType<typeof mock>;
 	let deleteFolder: ReturnType<typeof mock>;
-	let getAllByFolderId: ReturnType<typeof mock>;
+	let getItemsByFolderId: ReturnType<typeof mock>;
 
 	beforeEach(() => {
-		getRoot = mock(() => Promise.resolve([mockFolder]));
-		getByParentId = mock(() => Promise.resolve([mockChildFolder]));
+		getRootPage = mock(() => Promise.resolve([mockFolder]));
 		getById = mock((id: number) =>
 			Promise.resolve(
 				id === 1 ? mockFolder : id === 2 ? mockChildFolder : null,
@@ -49,34 +46,77 @@ describe("FolderService", () => {
 		create = mock(() => Promise.resolve(mockFolder));
 		update = mock(() => Promise.resolve(mockFolder));
 		deleteFolder = mock(() => Promise.resolve());
-		getAllByFolderId = mock(() => Promise.resolve([mockFile]));
+		getItemsByFolderId = mock(() =>
+			Promise.resolve([
+				{ type: "folder", id: mockChildFolder.id, name: mockChildFolder.name },
+				{ type: "file", id: 10, name: "notes.txt" },
+			]),
+		);
 
 		const mockRepo: FolderRepository = {
-			getRoot,
-			getByParentId,
+			getRootPage,
 			getById,
+			getItemsByFolderId,
 			create,
 			update,
 			delete: deleteFolder,
 		};
 
-		const mockFileRepo: FileRepository = {
-			getAllByFolderId,
-			getById: mock(),
-			create: mock(),
-			update: mock(),
-			delete: mock(),
-		};
-
-		service = new FolderService(mockRepo, mockFileRepo);
+		service = new FolderService(mockRepo);
 	});
 
 	describe("getAll", () => {
-		it("returns all root folders", async () => {
+		it("returns root folders in a paginated result", async () => {
 			const result = await service.getAll();
 
-			expect(result).toEqual([mockFolder]);
-			expect(getRoot.mock.calls).toEqual([[]]);
+			expect(result).toEqual({
+				items: [mockFolder],
+				nextCursor: null,
+			});
+			expect(getRootPage.mock.calls).toEqual([
+				[{ limit: 51, cursor: undefined }],
+			]);
+		});
+
+		it("returns a next cursor when more root folders exist", async () => {
+			getRootPage = mock(() => Promise.resolve([mockFolder, mockSecondFolder]));
+			const mockRepo: FolderRepository = {
+				getRootPage,
+				getById,
+				getItemsByFolderId,
+				create,
+				update,
+				delete: deleteFolder,
+			};
+			service = new FolderService(mockRepo);
+
+			const result = await service.getAll({ limit: 1 });
+
+			expect(result.items).toEqual([mockFolder]);
+			expect(typeof result.nextCursor).toBe("string");
+			expect(getRootPage.mock.calls).toEqual([
+				[{ limit: 2, cursor: undefined }],
+			]);
+		});
+
+		it("decodes a valid root folder cursor before listing", async () => {
+			const cursor = Buffer.from(
+				JSON.stringify({ name: "Documents", id: 1 }),
+				"utf8",
+			).toString("base64url");
+
+			await service.getAll({ limit: 10, cursor });
+
+			expect(getRootPage.mock.calls).toEqual([
+				[{ limit: 11, cursor: { name: "Documents", id: 1 } }],
+			]);
+		});
+
+		it("throws BadRequestError for invalid root folder cursors", async () => {
+			await expect(
+				service.getAll({ cursor: "not-a-valid-cursor" }),
+			).rejects.toBeInstanceOf(BadRequestError);
+			expect(getRootPage.mock.calls).toEqual([]);
 		});
 	});
 
@@ -84,13 +124,53 @@ describe("FolderService", () => {
 		it("returns child folders and files when folder exists", async () => {
 			const result = await service.getItemsByFolderId(1);
 
-			expect(result).toEqual([
-				{ type: "folder", id: mockChildFolder.id, name: mockChildFolder.name },
-				{ type: "file", id: mockFile.id, name: mockFile.name },
-			]);
+			expect(result).toEqual({
+				items: [
+					{
+						type: "folder",
+						id: mockChildFolder.id,
+						name: mockChildFolder.name,
+					},
+					{ type: "file", id: 10, name: "notes.txt" },
+				],
+				nextCursor: null,
+			});
 			expect(getById.mock.calls).toEqual([[1]]);
-			expect(getByParentId.mock.calls).toEqual([[1]]);
-			expect(getAllByFolderId.mock.calls).toEqual([[1]]);
+			expect(getItemsByFolderId.mock.calls).toEqual([
+				[1, { limit: 51, cursor: undefined }],
+			]);
+		});
+
+		it("returns a next cursor when more folder items exist", async () => {
+			const result = await service.getItemsByFolderId(1, { limit: 1 });
+
+			expect(result.items).toEqual([
+				{ type: "folder", id: mockChildFolder.id, name: mockChildFolder.name },
+			]);
+			expect(typeof result.nextCursor).toBe("string");
+			expect(getItemsByFolderId.mock.calls).toEqual([
+				[1, { limit: 2, cursor: undefined }],
+			]);
+		});
+
+		it("decodes a valid folder item cursor before listing", async () => {
+			const cursor = Buffer.from(
+				JSON.stringify({ type: "folder", name: "Child", id: 2 }),
+				"utf8",
+			).toString("base64url");
+
+			await service.getItemsByFolderId(1, { limit: 10, cursor });
+
+			expect(getItemsByFolderId.mock.calls).toEqual([
+				[1, { limit: 11, cursor: { type: "folder", name: "Child", id: 2 } }],
+			]);
+		});
+
+		it("throws BadRequestError for invalid folder item cursors", async () => {
+			await expect(
+				service.getItemsByFolderId(1, { cursor: "not-a-valid-cursor" }),
+			).rejects.toBeInstanceOf(BadRequestError);
+			expect(getItemsByFolderId.mock.calls).toEqual([]);
 		});
 
 		it("throws NotFoundError when folder does not exist", async () => {
@@ -98,8 +178,7 @@ describe("FolderService", () => {
 				NotFoundError,
 			);
 			expect(getById.mock.calls).toEqual([[999]]);
-			expect(getByParentId.mock.calls).toEqual([]);
-			expect(getAllByFolderId.mock.calls).toEqual([]);
+			expect(getItemsByFolderId.mock.calls).toEqual([]);
 		});
 	});
 

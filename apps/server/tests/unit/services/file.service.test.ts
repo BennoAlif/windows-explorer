@@ -48,9 +48,9 @@ describe("FileService", () => {
 		};
 
 		const folderRepository: FolderRepository = {
-			getRoot: mock(),
-			getByParentId: mock(),
+			getRootPage: mock(),
 			getById: folderGetById,
+			getItemsByFolderId: mock(),
 			create: mock(),
 			update: mock(),
 			delete: mock(),

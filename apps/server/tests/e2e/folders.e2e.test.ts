@@ -7,7 +7,11 @@ import { foldersRoute } from "../../src/routes/folders";
 import { searchRoute } from "../../src/routes/search";
 import type { ApiErrorDetail, ApiResponse } from "../../src/types/api";
 import type { FileEntity } from "../../src/types/file";
-import type { Folder, FolderItem } from "../../src/types/folder";
+import type {
+	Folder,
+	FolderItemResult,
+	FolderListResult,
+} from "../../src/types/folder";
 import type { SearchResult } from "../../src/types/search";
 
 const BASE = "http://localhost:4000";
@@ -71,12 +75,49 @@ afterEach(async () => {
 });
 
 describe("GET /v1/folders", () => {
-	it("returns 200 with array data", async () => {
+	it("returns 200 with a paginated result", async () => {
 		const res = await fetch(`${BASE}/v1/folders`);
-		const body = (await res.json()) as ApiResponse<Folder[]>;
+		const body = (await res.json()) as ApiResponse<FolderListResult>;
 		expect(res.status).toBe(200);
 		expect(body.success).toBe(true);
-		expect(Array.isArray(body.data)).toBe(true);
+		expect(Array.isArray(body.data?.items)).toBe(true);
+	});
+
+	it("paginates root folders with a cursor", async () => {
+		const token = `000-e2e-root-cursor-${Date.now()}`;
+		const firstRes = await post({ name: `${token}-a` });
+		const first = (await firstRes.json()) as ApiResponse<Folder>;
+		if (!first.data) throw new Error("Expected first folder data");
+		createdIds.push(first.data.id);
+
+		const secondRes = await post({ name: `${token}-b` });
+		const second = (await secondRes.json()) as ApiResponse<Folder>;
+		if (!second.data) throw new Error("Expected second folder data");
+		createdIds.push(second.data.id);
+
+		const pageOneRes = await fetch(`${BASE}/v1/folders?limit=1`);
+		expect(pageOneRes.status).toBe(200);
+		const pageOne = (await pageOneRes.json()) as ApiResponse<FolderListResult>;
+		expect(pageOne.data?.items).toHaveLength(1);
+		expect(typeof pageOne.data?.nextCursor).toBe("string");
+
+		const firstItem = pageOne.data?.items[0];
+		const cursor = pageOne.data?.nextCursor;
+		if (!firstItem || !cursor) throw new Error("Expected root page cursor");
+
+		const pageTwoRes = await fetch(
+			`${BASE}/v1/folders?limit=1&cursor=${encodeURIComponent(cursor)}`,
+		);
+		expect(pageTwoRes.status).toBe(200);
+		const pageTwo = (await pageTwoRes.json()) as ApiResponse<FolderListResult>;
+		expect(pageTwo.data?.items).toHaveLength(1);
+		expect(pageTwo.data?.items[0]).not.toEqual(firstItem);
+	});
+
+	it("returns 400 for an invalid root folder cursor", async () => {
+		const res = await fetch(`${BASE}/v1/folders?cursor=invalid-cursor`);
+
+		await expectErrorResponse(res, 400, "BAD_REQUEST", "Invalid cursor");
 	});
 });
 
@@ -103,18 +144,71 @@ describe("GET /v1/folders/:id/items", () => {
 
 		const res = await fetch(`${BASE}/v1/folders/${parent.data.id}/items`);
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as ApiResponse<FolderItem[]>;
+		const body = (await res.json()) as ApiResponse<FolderItemResult>;
 		expect(body.success).toBe(true);
 		expect(
-			body.data?.some(
+			body.data?.items.some(
 				(item) => item.type === "folder" && item.id === child.data?.id,
 			),
 		).toBe(true);
 		expect(
-			body.data?.some(
+			body.data?.items.some(
 				(item) => item.type === "file" && item.id === file.data?.id,
 			),
 		).toBe(true);
+		expect(body.data?.nextCursor).toBeNull();
+	});
+
+	it("paginates folder items with a cursor", async () => {
+		const parentRes = await post({ name: `e2e-items-parent-${Date.now()}` });
+		const parent = (await parentRes.json()) as ApiResponse<Folder>;
+		if (!parent.data) throw new Error("Expected parent folder data");
+		createdIds.push(parent.data.id);
+
+		const childRes = await post({
+			name: `e2e-items-child-${Date.now()}`,
+			parentId: parent.data.id,
+		});
+		const child = (await childRes.json()) as ApiResponse<Folder>;
+		if (!child.data) throw new Error("Expected child folder data");
+		createdIds.push(child.data.id);
+
+		await postFile(parent.data.id, {
+			name: `e2e-items-file-${Date.now()}.txt`,
+		});
+
+		const pageOneRes = await fetch(
+			`${BASE}/v1/folders/${parent.data.id}/items?limit=1`,
+		);
+		expect(pageOneRes.status).toBe(200);
+		const pageOne = (await pageOneRes.json()) as ApiResponse<FolderItemResult>;
+		expect(pageOne.data?.items).toHaveLength(1);
+		expect(typeof pageOne.data?.nextCursor).toBe("string");
+
+		const firstItem = pageOne.data?.items[0];
+		const cursor = pageOne.data?.nextCursor;
+		if (!firstItem || !cursor) throw new Error("Expected folder item cursor");
+
+		const pageTwoRes = await fetch(
+			`${BASE}/v1/folders/${parent.data.id}/items?limit=1&cursor=${encodeURIComponent(cursor)}`,
+		);
+		expect(pageTwoRes.status).toBe(200);
+		const pageTwo = (await pageTwoRes.json()) as ApiResponse<FolderItemResult>;
+		expect(pageTwo.data?.items).toHaveLength(1);
+		expect(pageTwo.data?.items[0]).not.toEqual(firstItem);
+	});
+
+	it("returns 400 for an invalid folder item cursor", async () => {
+		const parentRes = await post({ name: `e2e-items-invalid-${Date.now()}` });
+		const parent = (await parentRes.json()) as ApiResponse<Folder>;
+		if (!parent.data) throw new Error("Expected parent folder data");
+		createdIds.push(parent.data.id);
+
+		const res = await fetch(
+			`${BASE}/v1/folders/${parent.data.id}/items?cursor=invalid-cursor`,
+		);
+
+		await expectErrorResponse(res, 400, "BAD_REQUEST", "Invalid cursor");
 	});
 
 	it("returns 404 for a missing folder", async () => {
