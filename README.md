@@ -13,6 +13,14 @@ A Bun workspace with a Vue web app, an Elysia API server, and a Drizzle/PostgreS
 bun install
 ```
 
+## Run With Docker Compose
+
+Build and start the local stack with Docker Compose:
+
+```bash
+POSTGRES_PASSWORD=windows-explorer docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
 ## Database
 
 The local database URL defaults to:
