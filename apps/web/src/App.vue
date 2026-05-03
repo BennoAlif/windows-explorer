@@ -14,7 +14,7 @@ import {
   updateFolder,
   type FolderNode,
 } from '@/lib/api';
-import { Search, X } from 'lucide-vue-next';
+import { PanelLeftOpen, Search, X } from 'lucide-vue-next';
 import FolderTree from '@/components/FolderTree.vue';
 import FolderContents from '@/components/FolderContents.vue';
 import SearchResults from '@/components/SearchResults.vue';
@@ -22,6 +22,7 @@ import SearchResults from '@/components/SearchResults.vue';
 const folders = ref<FolderNode[]>([]);
 const selectedFolder = ref<FolderNode | null>(null);
 const loading = ref(true);
+const sidebarOpen = ref(false);
 const loadingMoreRoots = ref(false);
 const rootNextCursor = ref<string | null>(null);
 const error = ref<string | null>(null);
@@ -519,30 +520,45 @@ async function handleSearchResultSelect(item: SearchItemDTO) {
 <template>
   <main class="flex h-svh flex-col bg-background text-foreground">
     <header class="shrink-0 border-b px-4 py-2">
-      <div class="relative flex items-center">
-        <Search
-          class="pointer-events-none absolute left-3 size-4 text-muted-foreground"
-        />
-        <input
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search files and folders..."
-          class="h-9 w-full rounded-md border bg-transparent py-1 pl-9 pr-9 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          @input="onSearchInput"
-        />
+      <div class="relative flex items-center gap-2">
         <button
-          v-if="searchQuery"
           type="button"
-          class="absolute right-3 text-muted-foreground hover:text-foreground"
-          @click="clearSearch"
+          class="flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground md:hidden"
+          @click="sidebarOpen = !sidebarOpen"
         >
-          <X class="size-4" />
+          <PanelLeftOpen class="size-5" />
         </button>
+
+        <div class="relative min-w-0 flex-1">
+          <Search
+            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search files and folders..."
+            class="h-9 w-full rounded-md border bg-transparent py-1 pl-9 pr-9 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+            @input="onSearchInput"
+          />
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            @click="clearSearch"
+          >
+            <X class="size-4" />
+          </button>
+        </div>
       </div>
     </header>
 
-    <div class="grid min-h-0 flex-1 grid-cols-[320px_1fr]">
-      <aside class="flex min-h-0 flex-col border-r bg-muted/30">
+    <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_1fr]">
+      <aside
+        :class="[
+          'flex-col border-b bg-muted/30 md:border-b-0 md:border-r md:min-h-0',
+          sidebarOpen ? 'flex max-h-64 md:max-h-none' : 'hidden md:flex',
+        ]"
+      >
         <div class="shrink-0 border-b px-3 py-2">
           <h1 class="text-sm font-semibold">Folders</h1>
         </div>

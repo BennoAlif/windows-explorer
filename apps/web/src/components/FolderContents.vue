@@ -77,8 +77,9 @@ async function handleScroll(event: Event) {
 
 watchEffect(async () => {
   const folder = props.folder;
-  const _len = items.value.length;
-  const _mode = viewMode.value;
+  // Track reactive dependencies: re-run when items change or view mode changes
+  void items.value.length;
+  void viewMode.value;
 
   if (!folder?.nextCursor || folder.isLoading) return;
 
@@ -96,7 +97,9 @@ watchEffect(async () => {
 <template>
   <div class="flex h-full flex-col gap-4">
     <header class="shrink-0 border-b pb-3">
-      <div class="flex items-start justify-between gap-3">
+      <div
+        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div class="flex min-w-0 items-center gap-2">
           <Button
             type="button"
@@ -143,10 +146,10 @@ watchEffect(async () => {
           </Breadcrumb>
         </div>
 
-        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+        <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
           <Button type="button" size="sm" @click="$emit('createFolder')">
             <FolderPlus data-icon="inline-start" />
-            New Folder
+            <span class="hidden sm:inline">New Folder</span>
           </Button>
 
           <Button
@@ -157,7 +160,7 @@ watchEffect(async () => {
             @click="$emit('createFile')"
           >
             <FilePlus data-icon="inline-start" />
-            New File
+            <span class="hidden sm:inline">New File</span>
           </Button>
 
           <Button
@@ -168,7 +171,7 @@ watchEffect(async () => {
             @click="$emit('renameFolder')"
           >
             <Pencil data-icon="inline-start" />
-            Rename
+            <span class="hidden sm:inline">Rename</span>
           </Button>
 
           <Button
@@ -179,7 +182,7 @@ watchEffect(async () => {
             @click="$emit('deleteFolder')"
           >
             <Trash2 data-icon="inline-start" />
-            Delete
+            <span class="hidden sm:inline">Delete</span>
           </Button>
 
           <div class="ml-1 flex items-center rounded-md border">
