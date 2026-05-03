@@ -98,9 +98,9 @@ watchEffect(async () => {
   <div class="flex h-full flex-col gap-4">
     <header class="shrink-0 border-b pb-3">
       <div
-        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
       >
-        <div class="flex min-w-0 items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2 overflow-hidden">
           <Button
             type="button"
             size="icon-sm"
@@ -111,9 +111,9 @@ watchEffect(async () => {
             <ArrowLeft />
           </Button>
 
-          <Breadcrumb class="min-w-0">
-            <BreadcrumbList class="flex-nowrap">
-              <BreadcrumbItem>
+          <Breadcrumb class="min-w-0 overflow-x-auto overflow-y-hidden">
+            <BreadcrumbList class="w-max flex-nowrap">
+              <BreadcrumbItem class="shrink-0">
                 <BreadcrumbLink
                   as="button"
                   class="cursor-pointer text-sm"
@@ -124,8 +124,8 @@ watchEffect(async () => {
               </BreadcrumbItem>
 
               <template v-for="(crumb, i) in breadcrumbs" :key="crumb.id">
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
+                <BreadcrumbSeparator class="shrink-0" />
+                <BreadcrumbItem class="shrink-0">
                   <BreadcrumbPage
                     v-if="i === breadcrumbs.length - 1"
                     class="max-w-45 truncate text-sm"
@@ -146,7 +146,7 @@ watchEffect(async () => {
           </Breadcrumb>
         </div>
 
-        <div class="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+        <div class="flex flex-wrap gap-2 sm:justify-end">
           <Button type="button" size="sm" @click="$emit('createFolder')">
             <FolderPlus data-icon="inline-start" />
             <span class="hidden sm:inline">New Folder</span>

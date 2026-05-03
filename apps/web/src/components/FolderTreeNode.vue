@@ -24,7 +24,7 @@ async function toggleOpen() {
 
 <template>
   <div
-    class="flex h-8 items-center gap-1 rounded-md px-1 text-sm hover:bg-accent hover:text-accent-foreground"
+    class="flex h-8 w-max min-w-full items-center gap-1 rounded-md px-1 pr-3 text-sm hover:bg-accent hover:text-accent-foreground"
     :class="folder.id === selectedId ? 'bg-accent text-accent-foreground' : ''"
     :style="{ paddingLeft: `${depth * 16 + 4}px` }"
     @click="$emit('select', folder)"
@@ -44,7 +44,7 @@ async function toggleOpen() {
 
     <Folder class="size-4 shrink-0" />
 
-    <span class="min-w-0 truncate">
+    <span class="whitespace-nowrap">
       {{ folder.name }}
     </span>
   </div>
