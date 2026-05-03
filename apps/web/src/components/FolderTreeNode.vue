@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, Folder } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { loadFolderNodeItems, type FolderNode } from '@/lib/api';
-
-defineOptions({
-  name: 'FolderTreeNode',
-});
+import { loadFolderNodeChildren, type FolderNode } from '@/lib/api';
 
 const props = defineProps<{
   folder: FolderNode;
@@ -18,48 +14,38 @@ defineEmits<{
 }>();
 
 async function toggleOpen() {
-  await loadFolderNodeItems(props.folder);
+  await loadFolderNodeChildren(props.folder);
+
   if (!props.folder.children.length) return;
+
   props.folder.isOpen = !props.folder.isOpen;
 }
 </script>
 
 <template>
-  <div>
-    <div
-      class="flex h-8 items-center gap-1 rounded-md px-1 text-sm hover:bg-accent hover:text-accent-foreground"
-      :class="
-        folder.id === selectedId ? 'bg-accent text-accent-foreground' : ''
-      "
-      :style="{ paddingLeft: `${depth * 16 + 4}px` }"
-      @click="$emit('select', folder)"
+  <div
+    class="flex h-8 items-center gap-1 rounded-md px-1 text-sm hover:bg-accent hover:text-accent-foreground"
+    :class="folder.id === selectedId ? 'bg-accent text-accent-foreground' : ''"
+    :style="{ paddingLeft: `${depth * 16 + 4}px` }"
+    @click="$emit('select', folder)"
+  >
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      class="shrink-0"
+      :disabled="folder.isLoading || (folder.childrenLoaded && !folder.children.length)"
+      @click.stop="toggleOpen"
     >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        class="shrink-0"
-        :disabled="folder.isLoading || (folder.itemsLoaded && !folder.children.length)"
-        @click.stop="toggleOpen"
-      >
-        <ChevronDown v-if="folder.children.length && folder.isOpen" />
-        <ChevronRight v-else-if="!folder.itemsLoaded || folder.children.length" />
-        <span v-else class="size-4" />
-      </Button>
-      <Folder class="size-4 shrink-0" />
-      <span class="min-w-0 truncate">
-        {{ folder.name }}
-      </span>
-    </div>
-    <div v-if="folder.isOpen">
-      <FolderTreeNode
-        v-for="child in folder.children"
-        :key="child.id"
-        :folder="child"
-        :selected-id="selectedId"
-        :depth="depth + 1"
-        @select="$emit('select', $event)"
-      />
-    </div>
+      <ChevronDown v-if="folder.children.length && folder.isOpen" />
+      <ChevronRight v-else-if="!folder.childrenLoaded || folder.children.length" />
+      <span v-else class="size-4" />
+    </Button>
+
+    <Folder class="size-4 shrink-0" />
+
+    <span class="min-w-0 truncate">
+      {{ folder.name }}
+    </span>
   </div>
 </template>

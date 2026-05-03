@@ -5,7 +5,6 @@ import type {
 	FolderItemDTO,
 	FolderItemResultDTO,
 	FolderListResultDTO,
-	PageResult,
 } from "types";
 
 const API_BASE_URL = (
@@ -18,6 +17,8 @@ export type FolderNode = Pick<FolderDTO, "id" | "name" | "parentId"> & {
 	isOpen: boolean;
 	isLoading: boolean;
 	itemsLoaded: boolean;
+	childrenLoaded: boolean;
+	nextCursor: string | null;
 };
 
 export class ApiClientError extends Error {
@@ -56,45 +57,17 @@ const request = async <T>(
 	return body.data;
 };
 
-const requestAllPages = async <T>(
-	path: string,
-	params?: Record<string, string | number | null | undefined>,
-): Promise<T[]> => {
-	const items: T[] = [];
-	let cursor: string | null = null;
-
-	do {
-		const page: PageResult<T> = await request(path, {
-			...params,
-			cursor,
-		});
-
-		items.push(...page.items);
-		cursor = page.nextCursor;
-	} while (cursor);
-
-	return items;
-};
-
-export const getRootFolders = async (): Promise<FolderDTO[]> =>
-	requestAllPages<FolderDTO>("/folders", { limit: 100 });
-
-export const getFolderItems = async (
-	folderId: FolderDTO["id"],
-): Promise<FolderItemDTO[]> =>
-	requestAllPages<FolderItemDTO>(`/folders/${folderId}/items`, { limit: 100 });
-
 export const getRootFoldersPage = (
 	cursor?: string,
 ): Promise<FolderListResultDTO> =>
-	request<FolderListResultDTO>("/folders", { limit: 100, cursor });
+	request<FolderListResultDTO>("/folders", { limit: 50, cursor });
 
 export const getFolderItemsPage = (
 	folderId: FolderDTO["id"],
 	cursor?: string,
 ): Promise<FolderItemResultDTO> =>
 	request<FolderItemResultDTO>(`/folders/${folderId}/items`, {
-		limit: 100,
+		limit: 50,
 		cursor,
 	});
 
@@ -107,7 +80,31 @@ const toFolderNode = (
 	isOpen: false,
 	isLoading: false,
 	itemsLoaded: false,
+	childrenLoaded: false,
+	nextCursor: null,
 });
+
+const appendFolderItemsPage = (
+	folder: FolderNode,
+	page: FolderItemResultDTO,
+): void => {
+	const childFolders = page.items.filter((item) => item.type === "folder");
+
+	folder.items.push(...page.items);
+	folder.children.push(
+		...childFolders.map((childFolder) =>
+			toFolderNode({
+				id: childFolder.id,
+				name: childFolder.name,
+				parentId: folder.id,
+			}),
+		),
+	);
+	folder.nextCursor = page.nextCursor;
+
+	const pageHasFiles = page.items.some((item) => item.type === "file");
+	folder.childrenLoaded = pageHasFiles || page.nextCursor === null;
+};
 
 export const loadFolderNodeItems = async (
 	folder: FolderNode,
@@ -116,26 +113,57 @@ export const loadFolderNodeItems = async (
 
 	folder.isLoading = true;
 	try {
-		const items = await getFolderItems(folder.id);
+		const page = await getFolderItemsPage(folder.id);
 
-		folder.items = items;
-		folder.children = items
-			.filter((item) => item.type === "folder")
-			.map((childFolder) =>
-				toFolderNode({
-					id: childFolder.id,
-					name: childFolder.name,
-					parentId: folder.id,
-				}),
-			);
+		folder.items = [];
+		folder.children = [];
+		appendFolderItemsPage(folder, page);
 		folder.itemsLoaded = true;
 	} finally {
 		folder.isLoading = false;
 	}
 };
 
-export const buildFolderTree = async (): Promise<FolderNode[]> => {
-	const rootFolders = await getRootFolders();
+export const loadMoreFolderNodeItems = async (
+	folder: FolderNode,
+): Promise<void> => {
+	if (!folder.itemsLoaded || !folder.nextCursor || folder.isLoading) return;
 
-	return rootFolders.map(toFolderNode);
+	folder.isLoading = true;
+	try {
+		const page = await getFolderItemsPage(folder.id, folder.nextCursor);
+
+		appendFolderItemsPage(folder, page);
+	} finally {
+		folder.isLoading = false;
+	}
+};
+
+export const loadFolderNodeChildren = async (
+	folder: FolderNode,
+): Promise<void> => {
+	if (!folder.itemsLoaded) {
+		await loadFolderNodeItems(folder);
+	}
+
+	while (!folder.childrenLoaded && folder.nextCursor) {
+		await loadMoreFolderNodeItems(folder);
+	}
+};
+
+export const loadRootFolderPage = async (
+	cursor?: string | null,
+): Promise<{ folders: FolderNode[]; nextCursor: string | null }> => {
+	const page = await getRootFoldersPage(cursor ?? undefined);
+
+	return {
+		folders: page.items.map(toFolderNode),
+		nextCursor: page.nextCursor,
+	};
+};
+
+export const buildFolderTree = async (): Promise<FolderNode[]> => {
+	const page = await loadRootFolderPage();
+
+	return page.folders;
 };
