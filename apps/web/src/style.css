@@ -41,6 +41,8 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
+  --color-folder: var(--folder);
+  --color-folder-fill: var(--folder-fill);
   --color-background: var(--background);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -51,6 +53,8 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  --folder: oklch(0.67 0.17 71);
+  --folder-fill: oklch(0.88 0.12 81 / 36%);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -86,6 +90,8 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --folder: oklch(0.82 0.13 80);
+  --folder-fill: oklch(0.82 0.13 80 / 22%);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -134,5 +140,9 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  .folder-icon {
+    @apply fill-folder-fill text-folder;
   }
 }

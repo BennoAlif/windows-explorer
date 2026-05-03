@@ -1,0 +1,17 @@
+services:
+  web:
+    ports:
+      - "8080:80"
+
+  server:
+    ports:
+      - "3000:3000"
+
+  postgres:
+    ports:
+      - "5433:5432"
+
+  jaeger:
+    ports:
+      - "16686:16686"
+      - "4318:4318"

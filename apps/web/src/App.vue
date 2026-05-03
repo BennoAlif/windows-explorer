@@ -56,8 +56,7 @@ type CrudDialogMode =
   | 'create-folder'
   | 'create-file'
   | 'rename-folder'
-  | 'rename-item'
-  | 'move-item';
+  | 'rename-item';
 
 type CrudDialogState = {
   open: boolean;
@@ -387,7 +386,7 @@ async function submitCrudDialog() {
   const item = crudDialog.value.item;
   const targetFolderId = crudDialog.value.targetFolderId;
 
-  if (mode !== 'move-item' && !value) {
+  if (!value) {
     error.value = 'Name is required';
     return;
   }
@@ -435,11 +434,6 @@ async function submitCrudDialog() {
         const file = await updateFile(item.id, { name: value });
         renameFileLocally(file);
       }
-    } else if (mode === 'move-item') {
-      if (!item) return;
-
-      const moved = await moveItemToTarget(item, value);
-      if (!moved) return;
     }
 
     crudDialog.value.open = false;
@@ -487,75 +481,6 @@ function renameItemAction(item: FolderItemDTO) {
     label: `${item.type === 'folder' ? 'Folder' : 'File'} name`,
     submitLabel: 'Rename',
     value: item.name,
-    item,
-    targetFolderId: null,
-  });
-}
-
-async function moveItemToTarget(
-  item: FolderItemDTO,
-  target: string,
-): Promise<boolean> {
-  const targetId = target === '' ? null : Number(target);
-  if (targetId !== null && !Number.isInteger(targetId)) {
-    error.value = 'Folder ID must be a number';
-    return false;
-  }
-
-  try {
-    if (item.type === 'folder') {
-      const folder = await updateFolder(item.id, { parentId: targetId });
-      const movedNode = removeFolderNode(folders.value, item.id);
-
-      removeItemFromLoadedFolders('folder', item.id);
-      appendFolderToParent(folder);
-
-      const appendedNode = findFolderNode(folders.value, folder.id);
-      if (movedNode && appendedNode) {
-        appendedNode.children = movedNode.children;
-        appendedNode.items = movedNode.items;
-        appendedNode.isOpen = movedNode.isOpen;
-        appendedNode.isLoading = movedNode.isLoading;
-        appendedNode.itemsLoaded = movedNode.itemsLoaded;
-        appendedNode.childrenLoaded = movedNode.childrenLoaded;
-        appendedNode.nextCursor = movedNode.nextCursor;
-
-        if (selectedFolder.value?.id === appendedNode.id) {
-          selectedFolder.value = appendedNode;
-        }
-      }
-      renameFolderLocally(folder);
-    } else {
-      if (targetId === null) {
-        error.value = 'Files must be moved into a folder';
-        return false;
-      }
-
-      const file = await updateFile(item.id, { folderId: targetId });
-
-      removeItemFromLoadedFolders('file', item.id);
-      appendFileToFolder(file);
-    }
-
-    return true;
-  } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : `Failed to move ${item.type}`;
-    return false;
-  }
-}
-
-function moveItemAction(item: FolderItemDTO) {
-  openCrudDialog({
-    mode: 'move-item',
-    title: `Move ${item.type}`,
-    description:
-      item.type === 'folder'
-        ? 'Enter a destination parent folder ID. Leave empty to move to root.'
-        : 'Enter a destination folder ID.',
-    label: 'Destination folder ID',
-    submitLabel: 'Move',
-    value: '',
     item,
     targetFolderId: null,
   });
@@ -818,7 +743,6 @@ async function handleSearchResultSelect(item: SearchItemDTO) {
           @rename-folder="renameSelectedFolderAction"
           @delete-folder="deleteSelectedFolderAction"
           @rename-item="renameItemAction"
-          @move-item="moveItemAction"
           @delete-item="deleteItemAction"
         />
       </section>

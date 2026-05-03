@@ -89,7 +89,7 @@ function handleScroll(event: Event) {
           >
             <Folder
               v-if="items[virtualRow.index].type === 'folder'"
-              class="size-4 shrink-0"
+              class="folder-icon size-4 shrink-0"
             />
             <File v-else class="size-4 shrink-0" />
 

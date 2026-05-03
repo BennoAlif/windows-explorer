@@ -184,14 +184,14 @@ describe("FolderContents", () => {
 
 		await findItemRow(wrapper, "Child folder").trigger("click");
 		await wrapper.get('button[title="Rename"]').trigger("click");
-		await wrapper.get('button[title="Move"]').trigger("click");
+		const moveButtons = wrapper.findAll('button[title="Move"]');
+		expect(moveButtons).toHaveLength(0);
 		await wrapper.get('button[title="Delete"]').trigger("click");
 
 		expect(wrapper.text()).toContain("Child folder");
 		expect(wrapper.text()).toContain("Notes.txt");
 		expect(wrapper.emitted("selectFolder")).toEqual([[folderItem]]);
 		expect(wrapper.emitted("renameItem")).toEqual([[folderItem]]);
-		expect(wrapper.emitted("moveItem")).toEqual([[folderItem]]);
 		expect(wrapper.emitted("deleteItem")).toEqual([[folderItem]]);
 	});
 

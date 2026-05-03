@@ -1,0 +1,16 @@
+.git
+.gitignore
+.cache
+.DS_Store
+.env
+.env.*
+coverage
+dist
+logs
+node_modules
+out
+report.*.json
+*.lcov
+*.log
+*.tgz
+*.tsbuildinfo

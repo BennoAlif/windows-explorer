@@ -42,7 +42,10 @@ const request = async <T>(
 	params?: Record<string, string | number | null | undefined>,
 	init?: RequestInit,
 ): Promise<T> => {
-	const url = new URL(`${API_BASE_URL}${path}`);
+	const url = new URL(
+		`${API_BASE_URL}${path}`,
+		globalThis.location?.origin ?? "http://localhost",
+	);
 
 	for (const [key, value] of Object.entries(params ?? {})) {
 		if (value !== undefined && value !== null) {

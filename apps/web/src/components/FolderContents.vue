@@ -9,7 +9,6 @@ import {
   FolderPlus,
   LayoutGrid,
   LayoutList,
-  MoveRight,
   Pencil,
   Trash2,
 } from 'lucide-vue-next';
@@ -40,7 +39,6 @@ defineEmits<{
   renameFolder: [];
   deleteFolder: [];
   renameItem: [item: FolderItemDTO];
-  moveItem: [item: FolderItemDTO];
   deleteItem: [item: FolderItemDTO];
 }>();
 
@@ -148,7 +146,7 @@ watchEffect(async () => {
 
         <div class="flex flex-wrap gap-2 sm:justify-end">
           <Button type="button" size="sm" @click="$emit('createFolder')">
-            <FolderPlus data-icon="inline-start" />
+            <FolderPlus data-icon="inline-start" class="folder-icon" />
             <span class="hidden sm:inline">New Folder</span>
           </Button>
 
@@ -263,7 +261,7 @@ watchEffect(async () => {
             >
               <Folder
                 v-if="items[virtualRow.index].type === 'folder'"
-                class="size-4 shrink-0"
+                class="folder-icon size-4 shrink-0"
               />
               <File v-else class="size-4 shrink-0" />
 
@@ -280,16 +278,6 @@ watchEffect(async () => {
                   @click.stop="$emit('renameItem', items[virtualRow.index])"
                 >
                   <Pencil />
-                </Button>
-
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="ghost"
-                  title="Move"
-                  @click.stop="$emit('moveItem', items[virtualRow.index])"
-                >
-                  <MoveRight />
                 </Button>
 
                 <Button
@@ -322,7 +310,10 @@ watchEffect(async () => {
             "
             @click="item.type === 'folder' && $emit('selectFolder', item)"
           >
-            <Folder v-if="item.type === 'folder'" class="size-10 shrink-0" />
+            <Folder
+              v-if="item.type === 'folder'"
+              class="folder-icon size-10 shrink-0"
+            />
             <File v-else class="size-10 shrink-0" />
 
             <span class="w-full truncate text-center text-xs">
@@ -340,15 +331,6 @@ watchEffect(async () => {
                 @click.stop="$emit('renameItem', item)"
               >
                 <Pencil />
-              </Button>
-              <Button
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                title="Move"
-                @click.stop="$emit('moveItem', item)"
-              >
-                <MoveRight />
               </Button>
               <Button
                 type="button"

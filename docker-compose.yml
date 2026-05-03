@@ -1,21 +1,81 @@
 services:
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        VITE_API_URL: /v1
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      server:
+        condition: service_healthy
+
+  server:
+    build:
+      context: .
+      target: server
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:?}@postgres:5432/windows-explorer
+      OTLP_TRACES_URL: http://jaeger:4318/v1/traces
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      jaeger:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:' + (process.env.PORT || '3000') + '/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  migrate:
+    build:
+      context: .
+      target: server
+    command: ["bun", "run", "db:migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:?}@postgres:5432/windows-explorer
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:17.5-alpine
-    container_name: windows-explorer-postgres
     restart: unless-stopped
-    ports:
-      - "5433:5432"
     environment:
       POSTGRES_USER: windows-explorer
-      POSTGRES_PASSWORD: windows-explorer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: windows-explorer
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U windows-explorer -d windows-explorer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   jaeger:
     image: jaegertracing/all-in-one:latest
-    container_name: windows-explorer-jaeger
-    ports:
-      - "16686:16686"
-      - "4318:4318"
+    restart: unless-stopped
+    expose:
+      - "16686"
+      - "4318"
+
 volumes:
   pgdata:

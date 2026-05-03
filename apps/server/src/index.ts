@@ -15,6 +15,10 @@ const v1 = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(filesRoute)
 	.use(searchRoute);
 
+const port = Number(process.env.PORT ?? 3000);
+const otlpTracesUrl =
+	process.env.OTLP_TRACES_URL ?? "http://localhost:4318/v1/traces";
+
 const app = withErrorHandling(new Elysia())
 	.use(cors())
 	.use(swagger({ path: "/docs" }))
@@ -23,7 +27,7 @@ const app = withErrorHandling(new Elysia())
 			spanProcessors: [
 				new BatchSpanProcessor(
 					new OTLPTraceExporter({
-						url: "http://localhost:4318/v1/traces",
+						url: otlpTracesUrl,
 					}),
 				),
 			],
@@ -31,7 +35,10 @@ const app = withErrorHandling(new Elysia())
 	)
 	.get("/", () => ok("Welcome to the Elysia API!"))
 	.use(v1)
-	.listen(3000);
+	.listen({
+		hostname: "0.0.0.0",
+		port,
+	});
 
 console.log(
 	`🦊 Elysia is running at http://${app.server?.hostname}:${app.server?.port}`,
