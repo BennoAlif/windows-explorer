@@ -8,9 +8,6 @@ services:
     restart: unless-stopped
     expose:
       - "80"
-    depends_on:
-      server:
-        condition: service_healthy
 
   server:
     build:
@@ -21,7 +18,7 @@ services:
       - "3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:?}@postgres:5432/windows-explorer
+      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:-windows-explorer}@postgres:5432/windows-explorer
       OTLP_TRACES_URL: http://jaeger:4318/v1/traces
     depends_on:
       postgres:
@@ -50,7 +47,7 @@ services:
     command: ["bun", "run", "db:migrate"]
     restart: "no"
     environment:
-      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:?}@postgres:5432/windows-explorer
+      DATABASE_URL: postgresql://windows-explorer:${POSTGRES_PASSWORD:-windows-explorer}@postgres:5432/windows-explorer
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,7 +57,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: windows-explorer
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-windows-explorer}
       POSTGRES_DB: windows-explorer
     volumes:
       - pgdata:/var/lib/postgresql/data
