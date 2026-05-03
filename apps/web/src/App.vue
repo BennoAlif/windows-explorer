@@ -18,6 +18,25 @@ import { PanelLeftOpen, Search, X } from 'lucide-vue-next';
 import FolderTree from '@/components/FolderTree.vue';
 import FolderContents from '@/components/FolderContents.vue';
 import SearchResults from '@/components/SearchResults.vue';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const folders = ref<FolderNode[]>([]);
 const selectedFolder = ref<FolderNode | null>(null);
@@ -32,6 +51,63 @@ const searchResults = ref<SearchItemDTO[]>([]);
 const searchNextCursor = ref<string | null>(null);
 const isSearchMode = ref(false);
 const searchLoading = ref(false);
+
+type CrudDialogMode =
+  | 'create-folder'
+  | 'create-file'
+  | 'rename-folder'
+  | 'rename-item'
+  | 'move-item';
+
+type CrudDialogState = {
+  open: boolean;
+  mode: CrudDialogMode | null;
+  title: string;
+  description: string;
+  label: string;
+  submitLabel: string;
+  value: string;
+  item: FolderItemDTO | null;
+  targetFolderId: number | null;
+};
+
+const crudDialog = ref<CrudDialogState>({
+  open: false,
+  mode: null,
+  title: '',
+  description: '',
+  label: '',
+  submitLabel: '',
+  value: '',
+  item: null,
+  targetFolderId: null,
+});
+const crudDialogSubmitting = ref(false);
+const crudDialogInputId = 'crud-dialog-input';
+
+type DeleteDialogTarget =
+  | {
+      type: 'selected-folder';
+      id: number;
+      name: string;
+    }
+  | {
+      type: 'item';
+      item: FolderItemDTO;
+    };
+
+const deleteDialog = ref<{
+  open: boolean;
+  title: string;
+  description: string;
+  target: DeleteDialogTarget | null;
+}>({
+  open: false,
+  title: '',
+  description: '',
+  target: null,
+});
+const deleteDialogSubmitting = ref(false);
 
 onMounted(async () => {
   try {
@@ -222,69 +298,173 @@ function appendFileToFolder(file: FileDTO) {
   });
 }
 
-async function createFolderAction() {
-  const name = window
-    .prompt(selectedFolder.value ? 'New folder name' : 'New root folder name')
-    ?.trim();
-
-  if (!name) return;
-
-  try {
-    const folder = await createFolder({
-      name,
-      parentId: selectedFolder.value?.id ?? null,
-    });
-
-    appendFolderToParent(folder);
-  } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : 'Failed to create folder';
-  }
+function openCrudDialog(config: Omit<CrudDialogState, 'open'>) {
+  error.value = null;
+  crudDialog.value = {
+    open: true,
+    ...config,
+  };
 }
 
-async function createFileAction() {
-  if (!selectedFolder.value) return;
-
-  const name = window.prompt('New file name')?.trim();
-  if (!name) return;
-
-  try {
-    const file = await createFile(selectedFolder.value.id, { name });
-
-    appendFileToFolder(file);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to create file';
-  }
+function closeCrudDialog() {
+  if (crudDialogSubmitting.value) return;
+  crudDialog.value.open = false;
 }
 
-async function renameSelectedFolderAction() {
+function openDeleteDialog(target: DeleteDialogTarget) {
+  error.value = null;
+
+  if (target.type === 'selected-folder') {
+    deleteDialog.value = {
+      open: true,
+      title: 'Delete Folder',
+      description: `Delete folder "${target.name}"? This action cannot be undone.`,
+      target,
+    };
+    return;
+  }
+
+  deleteDialog.value = {
+    open: true,
+    title: `Delete ${target.item.type}`,
+    description: `Delete ${target.item.type} "${target.item.name}"? This action cannot be undone.`,
+    target,
+  };
+}
+
+function createFolderAction() {
+  const parent = selectedFolder.value;
+
+  openCrudDialog({
+    mode: 'create-folder',
+    title: parent ? 'New Folder' : 'New Root Folder',
+    description: parent
+      ? `Create a folder in "${parent.name}".`
+      : 'Create a folder at the root level.',
+    label: 'Folder name',
+    submitLabel: 'Create',
+    value: '',
+    item: null,
+    targetFolderId: parent?.id ?? null,
+  });
+}
+
+function createFileAction() {
   if (!selectedFolder.value) return;
 
-  const name = window
-    .prompt('Rename folder', selectedFolder.value.name)
-    ?.trim();
-  if (!name || name === selectedFolder.value.name) return;
+  openCrudDialog({
+    mode: 'create-file',
+    title: 'New File',
+    description: `Create a file in "${selectedFolder.value.name}".`,
+    label: 'File name',
+    submitLabel: 'Create',
+    value: '',
+    item: null,
+    targetFolderId: selectedFolder.value.id,
+  });
+}
+
+function renameSelectedFolderAction() {
+  if (!selectedFolder.value) return;
+
+  openCrudDialog({
+    mode: 'rename-folder',
+    title: 'Rename Folder',
+    description: `Rename "${selectedFolder.value.name}".`,
+    label: 'Folder name',
+    submitLabel: 'Rename',
+    value: selectedFolder.value.name,
+    item: null,
+    targetFolderId: selectedFolder.value.id,
+  });
+}
+
+async function submitCrudDialog() {
+  const mode = crudDialog.value.mode;
+  if (!mode) return;
+
+  const value = crudDialog.value.value.trim();
+  const item = crudDialog.value.item;
+  const targetFolderId = crudDialog.value.targetFolderId;
+
+  if (mode !== 'move-item' && !value) {
+    error.value = 'Name is required';
+    return;
+  }
+
+  crudDialogSubmitting.value = true;
 
   try {
-    const folder = await updateFolder(selectedFolder.value.id, { name });
+    if (mode === 'create-folder') {
+      const folder = await createFolder({
+        name: value,
+        parentId: targetFolderId,
+      });
 
-    renameFolderLocally(folder);
+      appendFolderToParent(folder);
+    } else if (mode === 'create-file') {
+      if (targetFolderId === null) return;
+
+      const file = await createFile(targetFolderId, { name: value });
+
+      appendFileToFolder(file);
+    } else if (mode === 'rename-folder') {
+      if (targetFolderId === null) return;
+
+      const current = findFolderNode(folders.value, targetFolderId);
+      if (current?.name === value) {
+        crudDialog.value.open = false;
+        return;
+      }
+
+      const folder = await updateFolder(targetFolderId, { name: value });
+
+      renameFolderLocally(folder);
+    } else if (mode === 'rename-item') {
+      if (!item) return;
+
+      if (value === item.name) {
+        crudDialog.value.open = false;
+        return;
+      }
+
+      if (item.type === 'folder') {
+        const folder = await updateFolder(item.id, { name: value });
+        renameFolderLocally(folder);
+      } else {
+        const file = await updateFile(item.id, { name: value });
+        renameFileLocally(file);
+      }
+    } else if (mode === 'move-item') {
+      if (!item) return;
+
+      const moved = await moveItemToTarget(item, value);
+      if (!moved) return;
+    }
+
+    crudDialog.value.open = false;
   } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : 'Failed to rename folder';
+    error.value = err instanceof Error ? err.message : 'Action failed';
+  } finally {
+    crudDialogSubmitting.value = false;
   }
 }
 
 async function deleteSelectedFolderAction() {
   if (!selectedFolder.value) return;
-  if (!window.confirm(`Delete folder "${selectedFolder.value.name}"?`)) return;
 
-  const deletedId = selectedFolder.value.id;
+  openDeleteDialog({
+    type: 'selected-folder',
+    id: selectedFolder.value.id,
+    name: selectedFolder.value.name,
+  });
+}
 
+async function deleteSelectedFolder(id: number) {
   try {
-    await deleteFolder(deletedId);
-    const removed = removeFolderNode(folders.value, deletedId);
-    removeItemFromLoadedFolders('folder', deletedId);
+    await deleteFolder(id);
+    const removed = removeFolderNode(folders.value, id);
+    removeItemFromLoadedFolders('folder', id);
 
     if (
       !removed ||
@@ -299,39 +479,27 @@ async function deleteSelectedFolderAction() {
   }
 }
 
-async function renameItemAction(item: FolderItemDTO) {
-  const name = window.prompt(`Rename ${item.type}`, item.name)?.trim();
-  if (!name || name === item.name) return;
-
-  try {
-    if (item.type === 'folder') {
-      const folder = await updateFolder(item.id, { name });
-      renameFolderLocally(folder);
-    } else {
-      const file = await updateFile(item.id, { name });
-      renameFileLocally(file);
-    }
-  } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : `Failed to rename ${item.type}`;
-  }
+function renameItemAction(item: FolderItemDTO) {
+  openCrudDialog({
+    mode: 'rename-item',
+    title: `Rename ${item.type}`,
+    description: `Rename "${item.name}".`,
+    label: `${item.type === 'folder' ? 'Folder' : 'File'} name`,
+    submitLabel: 'Rename',
+    value: item.name,
+    item,
+    targetFolderId: null,
+  });
 }
 
-async function moveItemAction(item: FolderItemDTO) {
-  const target = window
-    .prompt(
-      item.type === 'folder'
-        ? 'Move to parent folder ID. Leave empty for root.'
-        : 'Move to folder ID.',
-    )
-    ?.trim();
-
-  if (target === undefined) return;
-
+async function moveItemToTarget(
+  item: FolderItemDTO,
+  target: string,
+): Promise<boolean> {
   const targetId = target === '' ? null : Number(target);
   if (targetId !== null && !Number.isInteger(targetId)) {
     error.value = 'Folder ID must be a number';
-    return;
+    return false;
   }
 
   try {
@@ -360,7 +528,7 @@ async function moveItemAction(item: FolderItemDTO) {
     } else {
       if (targetId === null) {
         error.value = 'Files must be moved into a folder';
-        return;
+        return false;
       }
 
       const file = await updateFile(item.id, { folderId: targetId });
@@ -368,15 +536,39 @@ async function moveItemAction(item: FolderItemDTO) {
       removeItemFromLoadedFolders('file', item.id);
       appendFileToFolder(file);
     }
+
+    return true;
   } catch (err) {
     error.value =
       err instanceof Error ? err.message : `Failed to move ${item.type}`;
+    return false;
   }
 }
 
-async function deleteItemAction(item: FolderItemDTO) {
-  if (!window.confirm(`Delete ${item.type} "${item.name}"?`)) return;
+function moveItemAction(item: FolderItemDTO) {
+  openCrudDialog({
+    mode: 'move-item',
+    title: `Move ${item.type}`,
+    description:
+      item.type === 'folder'
+        ? 'Enter a destination parent folder ID. Leave empty to move to root.'
+        : 'Enter a destination folder ID.',
+    label: 'Destination folder ID',
+    submitLabel: 'Move',
+    value: '',
+    item,
+    targetFolderId: null,
+  });
+}
 
+async function deleteItemAction(item: FolderItemDTO) {
+  openDeleteDialog({
+    type: 'item',
+    item,
+  });
+}
+
+async function deleteItem(item: FolderItemDTO) {
   try {
     if (item.type === 'folder') {
       await deleteFolder(item.id);
@@ -397,6 +589,25 @@ async function deleteItemAction(item: FolderItemDTO) {
   } catch (err) {
     error.value =
       err instanceof Error ? err.message : `Failed to delete ${item.type}`;
+  }
+}
+
+async function confirmDeleteAction() {
+  const target = deleteDialog.value.target;
+  if (!target) return;
+
+  deleteDialogSubmitting.value = true;
+
+  try {
+    if (target.type === 'selected-folder') {
+      await deleteSelectedFolder(target.id);
+    } else {
+      await deleteItem(target.item);
+    }
+
+    deleteDialog.value.open = false;
+  } finally {
+    deleteDialogSubmitting.value = false;
   }
 }
 
@@ -612,5 +823,70 @@ async function handleSearchResultSelect(item: SearchItemDTO) {
         />
       </section>
     </div>
+
+    <AlertDialog v-model:open="deleteDialog.open">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ deleteDialog.title }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ deleteDialog.description }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="deleteDialogSubmitting">
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            :disabled="deleteDialogSubmitting"
+            @click.prevent="confirmDeleteAction"
+          >
+            {{ deleteDialogSubmitting ? 'Deleting...' : 'Delete' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <Dialog v-model:open="crudDialog.open">
+      <DialogContent>
+        <form class="flex flex-col gap-4" @submit.prevent="submitCrudDialog">
+          <DialogHeader>
+            <DialogTitle>{{ crudDialog.title }}</DialogTitle>
+            <DialogDescription>
+              {{ crudDialog.description }}
+            </DialogDescription>
+          </DialogHeader>
+
+          <label
+            class="flex flex-col gap-2 text-sm font-medium"
+            :for="crudDialogInputId"
+          >
+            {{ crudDialog.label }}
+            <input
+              :id="crudDialogInputId"
+              v-model="crudDialog.value"
+              type="text"
+              autocomplete="off"
+              class="h-9 rounded-md border bg-transparent px-3 py-1 text-sm font-normal outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </label>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              :disabled="crudDialogSubmitting"
+              @click="closeCrudDialog"
+            >
+              Cancel
+            </Button>
+            <Button type="submit" :disabled="crudDialogSubmitting">
+              {{ crudDialogSubmitting ? 'Working...' : crudDialog.submitLabel }}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   </main>
 </template>
