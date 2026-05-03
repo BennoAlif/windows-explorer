@@ -1,9 +1,15 @@
 import { Elysia, t } from "elysia";
+import { ok } from "types";
+import {
+	toFileDTO,
+	toFolderDTO,
+	toFolderItemResultDTO,
+	toFolderListResultDTO,
+} from "../mappers/api";
 import { FileRepositoryImpl } from "../repositories/file.repository";
 import { FolderRepositoryImpl } from "../repositories/folder.repository";
 import { FileService } from "../services/file.service";
 import { FolderService } from "../services/folder.service";
-import { ok } from "../types/api";
 
 const folderService = new FolderService(new FolderRepositoryImpl());
 const fileService = new FileService(
@@ -16,10 +22,12 @@ export const foldersRoute = new Elysia({ prefix: "/folders" })
 		"/",
 		async ({ query }) =>
 			ok(
-				await folderService.getAll({
-					limit: query.limit,
-					cursor: query.cursor,
-				}),
+				toFolderListResultDTO(
+					await folderService.getAll({
+						limit: query.limit,
+						cursor: query.cursor,
+					}),
+				),
 			),
 		{
 			query: t.Object({
@@ -32,10 +40,12 @@ export const foldersRoute = new Elysia({ prefix: "/folders" })
 		"/:id/items",
 		async ({ params, query }) =>
 			ok(
-				await folderService.getItemsByFolderId(params.id, {
-					limit: query.limit,
-					cursor: query.cursor,
-				}),
+				toFolderItemResultDTO(
+					await folderService.getItemsByFolderId(params.id, {
+						limit: query.limit,
+						cursor: query.cursor,
+					}),
+				),
 			),
 		{
 			params: t.Object({ id: t.Number() }),
@@ -45,15 +55,20 @@ export const foldersRoute = new Elysia({ prefix: "/folders" })
 			}),
 		},
 	)
-	.post("/", async ({ body }) => ok(await folderService.create(body)), {
-		body: t.Object({
-			name: t.String({ minLength: 1 }),
-			parentId: t.Optional(t.Nullable(t.Number())),
-		}),
-	})
+	.post(
+		"/",
+		async ({ body }) => ok(toFolderDTO(await folderService.create(body))),
+		{
+			body: t.Object({
+				name: t.String({ minLength: 1 }),
+				parentId: t.Optional(t.Nullable(t.Number())),
+			}),
+		},
+	)
 	.patch(
 		"/:id",
-		async ({ params, body }) => ok(await folderService.update(params.id, body)),
+		async ({ params, body }) =>
+			ok(toFolderDTO(await folderService.update(params.id, body))),
 		{
 			params: t.Object({ id: t.Number() }),
 			body: t.Object({
@@ -65,7 +80,7 @@ export const foldersRoute = new Elysia({ prefix: "/folders" })
 	.post(
 		"/:folderId/files",
 		async ({ params, body }) =>
-			ok(await fileService.create(params.folderId, body)),
+			ok(toFileDTO(await fileService.create(params.folderId, body))),
 		{
 			params: t.Object({ folderId: t.Number() }),
 			body: t.Object({

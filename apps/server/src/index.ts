@@ -4,11 +4,11 @@ import { swagger } from "@elysiajs/swagger";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto/build/src/platform/node/OTLPTraceExporter";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { Elysia } from "elysia";
+import { ok } from "types";
 import { withErrorHandling } from "./plugins/error-handler";
 import { foldersRoute } from "./routes/folders";
 import { filesRoute } from "./routes/files";
 import { searchRoute } from "./routes/search";
-import { ok } from "./types/api";
 
 const v1 = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(foldersRoute)

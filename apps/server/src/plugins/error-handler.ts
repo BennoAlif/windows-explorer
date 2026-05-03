@@ -1,11 +1,11 @@
 import type { AnyElysia } from "elysia";
+import { type ApiErrorDetail, fail } from "types";
 import {
 	BadRequestError,
 	ConflictError,
 	InternalServerError,
 	NotFoundError,
 } from "../errors";
-import { type ApiErrorDetail, fail } from "../types/api";
 
 const ERROR_CODES = {
 	BadRequestError: "BAD_REQUEST",

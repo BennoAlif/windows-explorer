@@ -50,7 +50,7 @@ describe("SearchService", () => {
 		it("returns a next cursor when there are more rows than the requested limit", async () => {
 			const result = await service.globalSearch("notes", { limit: 1 });
 
-			expect(result.items).toEqual([mockResults[0]]);
+			expect(result.items).toEqual([mockResults[0]!]);
 			expect(typeof result.nextCursor).toBe("string");
 			expect(globalSearch.mock.calls).toEqual([
 				["notes", { limit: 2, cursor: undefined }],

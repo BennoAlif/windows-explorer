@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
+import { ok } from "types";
+import { toSearchResultDTO } from "../mappers/api";
 import { SearchRepositoryImpl } from "../repositories/search.repository";
 import { SearchService } from "../services/search.service";
-import { ok } from "../types/api";
 
 const service = new SearchService(new SearchRepositoryImpl());
 
@@ -9,10 +10,12 @@ export const searchRoute = new Elysia({ prefix: "/search" }).get(
 	"/",
 	async ({ query }) =>
 		ok(
-			await service.globalSearch(query.q, {
-				limit: query.limit,
-				cursor: query.cursor,
-			}),
+			toSearchResultDTO(
+				await service.globalSearch(query.q, {
+					limit: query.limit,
+					cursor: query.cursor,
+				}),
+			),
 		),
 	{
 		query: t.Object({

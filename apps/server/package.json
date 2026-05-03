@@ -1,26 +1,27 @@
 {
-  "name": "server",
-  "private": true,
-  "version": "1.0.50",
-  "scripts": {
-    "test": "bun test",
-    "test:unit": "bun test tests/unit",
-    "test:integration": "bun test tests/integration",
-    "test:e2e": "bun --env-file=.env.test test tests/e2e",
-    "dev": "bun run --watch src/index.ts"
-  },
-  "dependencies": {
-    "@elysia/opentelemetry": "^1.4.12",
-    "@elysiajs/cors": "^1.4.2",
-    "@elysiajs/swagger": "^1.3.1",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.216.0",
-    "@opentelemetry/sdk-trace-node": "^2.7.1",
-    "db": "workspace:*",
-    "elysia": "latest"
-  },
-  "devDependencies": {
-    "@types/supertest": "^7.2.0",
-    "bun-types": "latest",
-    "supertest": "^7.2.2"
-  }
+	"name": "server",
+	"private": true,
+	"version": "1.0.50",
+	"scripts": {
+		"test": "bun test",
+		"test:unit": "bun test tests/unit",
+		"test:integration": "bun test tests/integration",
+		"test:e2e": "bun --env-file=.env.test test tests/e2e",
+		"dev": "bun run --watch src/index.ts"
+	},
+	"dependencies": {
+		"@elysia/opentelemetry": "^1.4.12",
+		"@elysiajs/cors": "^1.4.2",
+		"@elysiajs/swagger": "^1.3.1",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.216.0",
+		"@opentelemetry/sdk-trace-node": "^2.7.1",
+		"db": "workspace:*",
+		"elysia": "latest",
+		"types": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/supertest": "^7.2.0",
+		"bun-types": "latest",
+		"supertest": "^7.2.2"
+	}
 }

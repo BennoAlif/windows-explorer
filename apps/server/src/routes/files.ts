@@ -1,8 +1,9 @@
 import { Elysia, t } from "elysia";
+import { ok } from "types";
+import { toFileDTO } from "../mappers/api";
 import { FileRepositoryImpl } from "../repositories/file.repository";
 import { FileService } from "../services/file.service";
 import { FolderRepositoryImpl } from "../repositories/folder.repository";
-import { ok } from "../types/api";
 
 const service = new FileService(
 	new FileRepositoryImpl(),
@@ -12,7 +13,8 @@ const service = new FileService(
 export const filesRoute = new Elysia({ prefix: "/files" })
 	.patch(
 		"/:id",
-		async ({ params, body }) => ok(await service.update(params.id, body)),
+		async ({ params, body }) =>
+			ok(toFileDTO(await service.update(params.id, body))),
 		{
 			params: t.Object({ id: t.Number() }),
 			body: t.Object({
