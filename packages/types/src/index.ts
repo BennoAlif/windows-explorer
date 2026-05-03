@@ -51,12 +51,28 @@ export type FolderDTO = {
 	updatedAt: string;
 };
 
+export type CreateFolderInput = {
+	name: string;
+	parentId?: number | null;
+};
+
+export type UpdateFolderInput = Partial<CreateFolderInput>;
+
 export type FileDTO = {
 	id: number;
 	name: string;
 	folderId: number;
 	createdAt: string;
 	updatedAt: string;
+};
+
+export type CreateFileInput = {
+	name: string;
+};
+
+export type UpdateFileInput = {
+	name?: string;
+	folderId?: number;
 };
 
 export type FolderItemDTO =

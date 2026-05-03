@@ -1,11 +1,45 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useVirtualizer } from '@tanstack/vue-virtual';
-import { File, Folder } from 'lucide-vue-next';
+import {
+  ArrowLeft,
+  File,
+  FilePlus,
+  Folder,
+  FolderPlus,
+  MoveRight,
+  Pencil,
+  Trash2,
+} from 'lucide-vue-next';
+import type { FolderItemDTO } from 'types';
+import { Button } from '@/components/ui/button';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { loadMoreFolderNodeItems, type FolderNode } from '@/lib/api';
 
 const props = defineProps<{
   folder: FolderNode | null;
+  breadcrumbs: FolderNode[];
+}>();
+
+defineEmits<{
+  createFolder: [];
+  createFile: [];
+  selectRoot: [];
+  goBack: [];
+  selectFolder: [item: FolderItemDTO];
+  navigateTo: [node: FolderNode];
+  renameFolder: [];
+  deleteFolder: [];
+  renameItem: [item: FolderItemDTO];
+  moveItem: [item: FolderItemDTO];
+  deleteItem: [item: FolderItemDTO];
 }>();
 
 const parentRef = ref<HTMLElement | null>(null);
@@ -40,33 +74,106 @@ async function handleScroll(event: Event) {
 </script>
 
 <template>
-  <div
-    v-if="!folder"
-    class="flex h-full items-center justify-center text-sm text-muted-foreground"
-  >
-    Select a folder
-  </div>
-
-  <div v-else class="flex h-full flex-col gap-4">
+  <div class="flex h-full flex-col gap-4">
     <header class="shrink-0 border-b pb-3">
-      <h1 class="text-lg font-semibold">
-        {{ folder.name }}
-      </h1>
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-2">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            :disabled="!folder"
+            @click="$emit('goBack')"
+          >
+            <ArrowLeft />
+          </Button>
 
-      <p class="text-sm text-muted-foreground">
-        <template v-if="folder.isLoading && !folder.itemsLoaded">
-          Loading...
-        </template>
-        <template v-else>
-          {{ folder.items.length }} item{{
-            folder.items.length === 1 ? '' : 's'
-          }}
-        </template>
-      </p>
+          <Breadcrumb class="min-w-0">
+            <BreadcrumbList class="flex-nowrap">
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  as="button"
+                  class="cursor-pointer text-sm"
+                  @click="$emit('selectRoot')"
+                >
+                  Explorer
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+
+              <template v-for="(crumb, i) in breadcrumbs" :key="crumb.id">
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage
+                    v-if="i === breadcrumbs.length - 1"
+                    class="max-w-45 truncate text-sm"
+                  >
+                    {{ crumb.name }}
+                  </BreadcrumbPage>
+                  <BreadcrumbLink
+                    v-else
+                    as="button"
+                    class="max-w-30 cursor-pointer truncate text-sm"
+                    @click="$emit('navigateTo', crumb)"
+                  >
+                    {{ crumb.name }}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+              </template>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+
+        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+          <Button type="button" size="sm" @click="$emit('createFolder')">
+            <FolderPlus data-icon="inline-start" />
+            New Folder
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            :disabled="!folder"
+            @click="$emit('createFile')"
+          >
+            <FilePlus data-icon="inline-start" />
+            New File
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            :disabled="!folder"
+            @click="$emit('renameFolder')"
+          >
+            <Pencil data-icon="inline-start" />
+            Rename
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            :disabled="!folder"
+            @click="$emit('deleteFolder')"
+          >
+            <Trash2 data-icon="inline-start" />
+            Delete
+          </Button>
+        </div>
+      </div>
     </header>
 
     <div
-      v-if="folder.isLoading && !folder.itemsLoaded"
+      v-if="!folder"
+      class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground"
+    >
+      Select a folder
+    </div>
+
+    <div
+      v-else-if="folder.isLoading && !folder.itemsLoaded"
       class="py-8 text-center text-sm text-muted-foreground"
     >
       Loading folder contents...
@@ -96,7 +203,16 @@ async function handleScroll(event: Event) {
           }"
         >
           <div
-            class="flex h-9 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent hover:text-accent-foreground"
+            class="flex h-9 items-center gap-2 rounded-md px-2 text-sm"
+            :class="
+              items[virtualRow.index].type === 'folder'
+                ? 'cursor-pointer hover:bg-accent hover:text-accent-foreground'
+                : 'hover:bg-accent/50'
+            "
+            @click="
+              items[virtualRow.index].type === 'folder' &&
+              $emit('selectFolder', items[virtualRow.index])
+            "
           >
             <Folder
               v-if="items[virtualRow.index].type === 'folder'"
@@ -107,6 +223,38 @@ async function handleScroll(event: Event) {
             <span class="min-w-0 truncate">
               {{ items[virtualRow.index].name }}
             </span>
+
+            <div class="ml-auto flex shrink-0 gap-1">
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                title="Rename"
+                @click.stop="$emit('renameItem', items[virtualRow.index])"
+              >
+                <Pencil />
+              </Button>
+
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                title="Move"
+                @click.stop="$emit('moveItem', items[virtualRow.index])"
+              >
+                <MoveRight />
+              </Button>
+
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                title="Delete"
+                @click.stop="$emit('deleteItem', items[virtualRow.index])"
+              >
+                <Trash2 />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

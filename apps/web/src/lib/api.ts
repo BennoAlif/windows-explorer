@@ -1,10 +1,16 @@
 import type {
 	ApiError,
 	ApiResponse,
+	CreateFileInput,
+	CreateFolderInput,
+	FileDTO,
 	FolderDTO,
 	FolderItemDTO,
 	FolderItemResultDTO,
 	FolderListResultDTO,
+	SearchResultDTO,
+	UpdateFileInput,
+	UpdateFolderInput,
 } from "types";
 
 const API_BASE_URL = (
@@ -34,6 +40,7 @@ export class ApiClientError extends Error {
 const request = async <T>(
 	path: string,
 	params?: Record<string, string | number | null | undefined>,
+	init?: RequestInit,
 ): Promise<T> => {
 	const url = new URL(`${API_BASE_URL}${path}`);
 
@@ -43,7 +50,7 @@ const request = async <T>(
 		}
 	}
 
-	const response = await fetch(url);
+	const response = await fetch(url, init);
 	const body = (await response.json()) as ApiResponse<T>;
 
 	if (!response.ok || !body.success) {
@@ -57,17 +64,28 @@ const request = async <T>(
 	return body.data;
 };
 
+const requestJson = async <T>(
+	path: string,
+	method: "POST" | "PATCH" | "DELETE",
+	body?: unknown,
+): Promise<T> =>
+	request<T>(path, undefined, {
+		method,
+		headers: body ? { "Content-Type": "application/json" } : undefined,
+		body: body ? JSON.stringify(body) : undefined,
+	});
+
 export const getRootFoldersPage = (
 	cursor?: string,
 ): Promise<FolderListResultDTO> =>
-	request<FolderListResultDTO>("/folders", { limit: 50, cursor });
+	request<FolderListResultDTO>("/folders", { limit: 25, cursor });
 
 export const getFolderItemsPage = (
 	folderId: FolderDTO["id"],
 	cursor?: string,
 ): Promise<FolderItemResultDTO> =>
 	request<FolderItemResultDTO>(`/folders/${folderId}/items`, {
-		limit: 50,
+		limit: 25,
 		cursor,
 	});
 
@@ -83,6 +101,34 @@ const toFolderNode = (
 	childrenLoaded: false,
 	nextCursor: null,
 });
+
+export const createFolder = (data: CreateFolderInput): Promise<FolderDTO> =>
+	requestJson<FolderDTO>("/folders", "POST", data);
+
+export const updateFolder = (
+	id: FolderDTO["id"],
+	data: UpdateFolderInput,
+): Promise<FolderDTO> =>
+	requestJson<FolderDTO>(`/folders/${id}`, "PATCH", data);
+
+export const deleteFolder = (id: FolderDTO["id"]): Promise<null> =>
+	requestJson<null>(`/folders/${id}`, "DELETE");
+
+export const createFile = (
+	folderId: FolderDTO["id"],
+	data: CreateFileInput,
+): Promise<FileDTO> =>
+	requestJson<FileDTO>(`/folders/${folderId}/files`, "POST", data);
+
+export const updateFile = (
+	id: FileDTO["id"],
+	data: UpdateFileInput,
+): Promise<FileDTO> => requestJson<FileDTO>(`/files/${id}`, "PATCH", data);
+
+export const deleteFile = (id: FileDTO["id"]): Promise<null> =>
+	requestJson<null>(`/files/${id}`, "DELETE");
+
+export const folderDTOToNode = toFolderNode;
 
 const appendFolderItemsPage = (
 	folder: FolderNode,
@@ -167,3 +213,9 @@ export const buildFolderTree = async (): Promise<FolderNode[]> => {
 
 	return page.folders;
 };
+
+export const searchPage = (
+	query: string,
+	cursor?: string,
+): Promise<SearchResultDTO> =>
+	request<SearchResultDTO>("/search", { q: query, limit: 25, cursor });
