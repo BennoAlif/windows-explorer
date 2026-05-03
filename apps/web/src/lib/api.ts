@@ -78,14 +78,14 @@ const requestJson = async <T>(
 export const getRootFoldersPage = (
 	cursor?: string,
 ): Promise<FolderListResultDTO> =>
-	request<FolderListResultDTO>("/folders", { limit: 25, cursor });
+	request<FolderListResultDTO>("/folders", { limit: 50, cursor });
 
 export const getFolderItemsPage = (
 	folderId: FolderDTO["id"],
 	cursor?: string,
 ): Promise<FolderItemResultDTO> =>
 	request<FolderItemResultDTO>(`/folders/${folderId}/items`, {
-		limit: 25,
+		limit: 50,
 		cursor,
 	});
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watchEffect } from 'vue';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import {
   ArrowLeft,
@@ -7,6 +7,8 @@ import {
   FilePlus,
   Folder,
   FolderPlus,
+  LayoutGrid,
+  LayoutList,
   MoveRight,
   Pencil,
   Trash2,
@@ -43,6 +45,7 @@ defineEmits<{
 }>();
 
 const parentRef = ref<HTMLElement | null>(null);
+const viewMode = ref<'list' | 'grid'>('list');
 
 const items = computed(() => props.folder?.items ?? []);
 
@@ -71,6 +74,23 @@ async function handleScroll(event: Event) {
     await loadMoreFolderNodeItems(props.folder);
   }
 }
+
+watchEffect(async () => {
+  const folder = props.folder;
+  const _len = items.value.length;
+  const _mode = viewMode.value;
+
+  if (!folder?.nextCursor || folder.isLoading) return;
+
+  await nextTick();
+
+  const el = parentRef.value;
+  if (!el) return;
+
+  if (el.scrollHeight <= el.clientHeight) {
+    await loadMoreFolderNodeItems(folder);
+  }
+});
 </script>
 
 <template>
@@ -161,6 +181,29 @@ async function handleScroll(event: Event) {
             <Trash2 data-icon="inline-start" />
             Delete
           </Button>
+
+          <div class="ml-1 flex items-center rounded-md border">
+            <Button
+              type="button"
+              size="icon-sm"
+              :variant="viewMode === 'list' ? 'secondary' : 'ghost'"
+              title="List view"
+              class="rounded-r-none border-r"
+              @click="viewMode = 'list'"
+            >
+              <LayoutList class="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              :variant="viewMode === 'grid' ? 'secondary' : 'ghost'"
+              title="Grid view"
+              class="rounded-l-none"
+              @click="viewMode = 'grid'"
+            >
+              <LayoutGrid class="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -192,72 +235,131 @@ async function handleScroll(event: Event) {
       class="min-h-0 flex-1 overflow-auto"
       @scroll="handleScroll"
     >
-      <div class="relative w-full" :style="{ height: `${totalSize}px` }">
+      <template v-if="viewMode === 'list'">
+        <div class="relative w-full" :style="{ height: `${totalSize}px` }">
+          <div
+            v-for="virtualRow in virtualRows"
+            :key="`${items[virtualRow.index].type}-${items[virtualRow.index].id}`"
+            class="absolute left-0 top-0 w-full"
+            :style="{
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`,
+            }"
+          >
+            <div
+              class="flex h-9 items-center gap-2 rounded-md px-2 text-sm"
+              :class="
+                items[virtualRow.index].type === 'folder'
+                  ? 'cursor-pointer hover:bg-accent hover:text-accent-foreground'
+                  : 'hover:bg-accent/50'
+              "
+              @click="
+                items[virtualRow.index].type === 'folder' &&
+                $emit('selectFolder', items[virtualRow.index])
+              "
+            >
+              <Folder
+                v-if="items[virtualRow.index].type === 'folder'"
+                class="size-4 shrink-0"
+              />
+              <File v-else class="size-4 shrink-0" />
+
+              <span class="min-w-0 truncate">
+                {{ items[virtualRow.index].name }}
+              </span>
+
+              <div class="ml-auto flex shrink-0 gap-1">
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Rename"
+                  @click.stop="$emit('renameItem', items[virtualRow.index])"
+                >
+                  <Pencil />
+                </Button>
+
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Move"
+                  @click.stop="$emit('moveItem', items[virtualRow.index])"
+                >
+                  <MoveRight />
+                </Button>
+
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Delete"
+                  @click.stop="$emit('deleteItem', items[virtualRow.index])"
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
         <div
-          v-for="virtualRow in virtualRows"
-          :key="`${items[virtualRow.index].type}-${items[virtualRow.index].id}`"
-          class="absolute left-0 top-0 w-full"
-          :style="{
-            height: `${virtualRow.size}px`,
-            transform: `translateY(${virtualRow.start}px)`,
-          }"
+          class="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-1 p-1"
         >
           <div
-            class="flex h-9 items-center gap-2 rounded-md px-2 text-sm"
+            v-for="item in items"
+            :key="`${item.type}-${item.id}`"
+            class="group relative flex flex-col items-center gap-1 rounded-lg p-3 text-sm"
             :class="
-              items[virtualRow.index].type === 'folder'
+              item.type === 'folder'
                 ? 'cursor-pointer hover:bg-accent hover:text-accent-foreground'
                 : 'hover:bg-accent/50'
             "
-            @click="
-              items[virtualRow.index].type === 'folder' &&
-              $emit('selectFolder', items[virtualRow.index])
-            "
+            @click="item.type === 'folder' && $emit('selectFolder', item)"
           >
-            <Folder
-              v-if="items[virtualRow.index].type === 'folder'"
-              class="size-4 shrink-0"
-            />
-            <File v-else class="size-4 shrink-0" />
+            <Folder v-if="item.type === 'folder'" class="size-10 shrink-0" />
+            <File v-else class="size-10 shrink-0" />
 
-            <span class="min-w-0 truncate">
-              {{ items[virtualRow.index].name }}
+            <span class="w-full truncate text-center text-xs">
+              {{ item.name }}
             </span>
 
-            <div class="ml-auto flex shrink-0 gap-1">
+            <div
+              class="absolute right-1 top-1 hidden gap-0.5 rounded-md bg-background/80 p-0.5 backdrop-blur-sm group-hover:flex"
+            >
               <Button
                 type="button"
                 size="icon-xs"
                 variant="ghost"
                 title="Rename"
-                @click.stop="$emit('renameItem', items[virtualRow.index])"
+                @click.stop="$emit('renameItem', item)"
               >
                 <Pencil />
               </Button>
-
               <Button
                 type="button"
                 size="icon-xs"
                 variant="ghost"
                 title="Move"
-                @click.stop="$emit('moveItem', items[virtualRow.index])"
+                @click.stop="$emit('moveItem', item)"
               >
                 <MoveRight />
               </Button>
-
               <Button
                 type="button"
                 size="icon-xs"
                 variant="ghost"
                 title="Delete"
-                @click.stop="$emit('deleteItem', items[virtualRow.index])"
+                @click.stop="$emit('deleteItem', item)"
               >
                 <Trash2 />
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <div
         v-if="folder.nextCursor || folder.isLoading"
