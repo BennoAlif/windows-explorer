@@ -8,6 +8,7 @@ import { withErrorHandling } from "./plugins/error-handler";
 import { foldersRoute } from "./routes/folders";
 import { filesRoute } from "./routes/files";
 import { searchRoute } from "./routes/search";
+import { ok } from "./types/api";
 
 const v1 = withErrorHandling(new Elysia({ prefix: "/v1" }))
 	.use(foldersRoute)
@@ -28,6 +29,7 @@ const app = withErrorHandling(new Elysia())
 			],
 		}),
 	)
+	.get("/", () => ok("Welcome to the Elysia API!"))
 	.use(v1)
 	.listen(3000);
 
