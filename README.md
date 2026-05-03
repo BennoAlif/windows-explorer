@@ -2,6 +2,8 @@
 
 A Bun workspace with a Vue web app, an Elysia API server, and a Drizzle/PostgreSQL database package.
 
+Deployed app: https://windows-explorer.wtfun.dev/
+
 ## Requirements
 
 - [Bun](https://bun.sh)
